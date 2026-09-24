@@ -1,3 +1,10 @@
 <Solution>
-  <Project Path="Services/Customer/Customer.fsproj" Id="09c215cc-a986-4b15-a47c-edaa9ac8f1d4" />
+  <Folder Name="/Services/" />
+  <Folder Name="/Services/Customer/">
+    <Project Path="Services/Customer/Customer.API/Customer.API.fsproj" />
+    <Project Path="Services/Customer/Customer.Application/Customer.Application.csproj" />
+    <Project Path="Services/Customer/Customer.Contracts/Customer.Contracts.csproj" />
+    <Project Path="Services/Customer/Customer.Domain/Customer.Domain.csproj" />
+    <Project Path="Services/Customer/Customer.Infrastructure/Customer.Infrastructure.csproj" />
+  </Folder>
 </Solution>

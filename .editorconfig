@@ -1,0 +1,5 @@
+root = true
+
+[*.cs]
+# New classes/interfaces created in Visual Studio use: namespace X;
+csharp_style_namespace_declarations = file_scoped:warning
