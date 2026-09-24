@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\PayNexa.Caching\PayNexa.Caching.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\PayNexa.Observability\PayNexa.Observability.csproj" />

@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Common\PayNexa.Common.csproj" />
     <ProjectReference Include="..\Customer.Contracts\Customer.Contracts.csproj" />
     <ProjectReference Include="..\Customer.Domai\Customer.Domai.csproj" />
