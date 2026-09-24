@@ -22,4 +22,11 @@
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.24.2-preview.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Observability\PayNexa.Observability.csproj" />
+    <ProjectReference Include="..\..\Customer\Payment\Payment.Application\Payment.Application.csproj" />
+    <ProjectReference Include="..\Payment.Infrastructure\Payment.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

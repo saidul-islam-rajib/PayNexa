@@ -6,4 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\BuildingBlocks\PayNexa.Common\PayNexa.Common.csproj" />
+    <ProjectReference Include="..\..\..\Payment\Payment.Contracts\Payment.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Payment\Payment.Domain\Payment.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

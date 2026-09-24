@@ -6,4 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Caching\PayNexa.Caching.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Messaging\PayNexa.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.MongoDb\PayNexa.MongoDb.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Vault\PayNexa.Vault.csproj" />
+    <ProjectReference Include="..\..\Customer\Payment\Payment.Application\Payment.Application.csproj" />
+  </ItemGroup>
+
 </Project>
