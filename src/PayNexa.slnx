@@ -3,9 +3,11 @@
     <Project Path="ApiGateway/PayNexa.ApiGateway/PayNexa.ApiGateway.csproj" Id="44c7787c-163e-4fb8-a3f3-c63c8a61b06b" />
   </Folder>
   <Folder Name="/BuildingBlocks/">
+    <Project Path="BuildingBlocks/PayNexa.Caching/PayNexa.Caching.csproj" Id="896c564d-6a79-4877-869a-77554a84c19d" />
     <Project Path="BuildingBlocks/PayNexa.Common/PayNexa.Common.csproj" Id="01309655-b330-49d6-bebb-c690e0faad09" />
     <Project Path="BuildingBlocks/PayNexa.Logging/PayNexa.Logging.csproj" Id="85a1d61c-4af2-4c09-a2f3-4595d12137ce" />
     <Project Path="BuildingBlocks/PayNexa.Messaging/PayNexa.Messaging.csproj" Id="914f0c12-4ca5-417f-a56d-9b0fa2d1fa47" />
+    <Project Path="BuildingBlocks/PayNexa.MongoDb/PayNexa.MongoDb.csproj" Id="de098b5b-0460-420d-befe-031dad46f099" />
     <Project Path="BuildingBlocks/PayNexa.Observability/PayNexa.Observability.csproj" Id="c815b153-ee57-423c-bac7-9e89c0875912" />
     <Project Path="BuildingBlocks/PayNexa.Vault/PayNexa.Vault.csproj" Id="ddbcc64d-f585-4433-81ba-ce13cce528f5" />
   </Folder>
