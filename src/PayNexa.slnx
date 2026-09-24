@@ -7,4 +7,11 @@
     <Project Path="Services/Customer/Customer.Domai/Customer.Domai.csproj" Id="17f906ca-b3a6-4d8e-b099-aac23a23f9cf" />
     <Project Path="Services/Customer/Customer.Infrastructure/Customer.Infrastructure.csproj" Id="bede32e0-ac8f-4570-8278-52979052f5e3" />
   </Folder>
+  <Folder Name="/Services/Payment/">
+    <Project Path="Services/Customer/Payment/Payment.Application/Payment.Application.csproj" Id="15e9af48-143e-4ee9-b78a-f1d8340a99f5" />
+    <Project Path="Services/Payment/Payment.API/Payment.API.fsproj" Id="b0939619-d5d7-4c0e-9b5a-6a912ac71982" />
+    <Project Path="Services/Payment/Payment.Contracts/Payment.Contracts.csproj" Id="cb6fbb35-34ab-48d4-92a8-e9cc5823d178" />
+    <Project Path="Services/Payment/Payment.Domain/Payment.Domain.csproj" Id="0b56f80a-4f33-4139-9d74-8c8f6ca89d59" />
+    <Project Path="Services/Payment/Payment.Infrastructure/Payment.Infrastructure.csproj" Id="316475a7-0df0-45de-8076-8bc9c00be8e8" />
+  </Folder>
 </Solution>
