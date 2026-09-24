@@ -24,4 +24,7 @@
     <Project Path="Services/Payment/Payment.Domain/Payment.Domain.csproj" Id="0b56f80a-4f33-4139-9d74-8c8f6ca89d59" />
     <Project Path="Services/Payment/Payment.Infrastructure/Payment.Infrastructure.csproj" Id="316475a7-0df0-45de-8076-8bc9c00be8e8" />
   </Folder>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>

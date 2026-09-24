@@ -1,0 +1,13 @@
+services:
+  payment.api:
+    image: ${DOCKER_REGISTRY-}paymentapi
+    build:
+      context: .
+      dockerfile: Services/Payment/Payment.API/Dockerfile
+
+  customer.api:
+    image: ${DOCKER_REGISTRY-}customerapi
+    build:
+      context: .
+      dockerfile: Services/Customer/Customer.API/Dockerfile
+
