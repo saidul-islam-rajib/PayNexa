@@ -1,6 +1,13 @@
 @Notification.API_HostAddress = http://localhost:5122
 
-GET {{Notification.API_HostAddress}}/weatherforecast/
-Accept: application/json
+GET {{Notification.API_HostAddress}}/health
+
+###
+
+GET {{Notification.API_HostAddress}}/health/live
+
+###
+
+GET {{Notification.API_HostAddress}}/health/ready
 
 ###

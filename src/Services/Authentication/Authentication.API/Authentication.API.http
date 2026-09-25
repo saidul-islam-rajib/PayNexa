@@ -1,6 +1,13 @@
 @Authentication.API_HostAddress = http://localhost:5111
 
-GET {{Authentication.API_HostAddress}}/weatherforecast/
-Accept: application/json
+GET {{Authentication.API_HostAddress}}/health
+
+###
+
+GET {{Authentication.API_HostAddress}}/health/live
+
+###
+
+GET {{Authentication.API_HostAddress}}/health/ready
 
 ###

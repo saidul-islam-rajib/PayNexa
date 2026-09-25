@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Services\Transaction\Transaction.Application\Transaction.Application.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Transaction\Transaction.Domain\Transaction.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

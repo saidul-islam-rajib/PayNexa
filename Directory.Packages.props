@@ -10,8 +10,12 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
   </ItemGroup>
 
+  <!-- Free OSS only: Mediator (MIT) instead of MediatR, which requires a commercial license from v13. -->
   <ItemGroup Label="Application">
+    <PackageVersion Include="Mediator.Abstractions" Version="3.0.2" />
+    <PackageVersion Include="Mediator.SourceGenerator" Version="3.0.2" />
     <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
   </ItemGroup>
 
   <ItemGroup Label="Persistence">
@@ -31,5 +35,13 @@
     <PackageVersion Include="Serilog.Sinks.Seq" Version="9.1.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
     <PackageVersion Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.4.0" />
+  </ItemGroup>
+
+  <!-- Free OSS only: Shouldly instead of FluentAssertions v8 (commercial), NSubstitute instead of Moq. -->
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="coverlet.MTP" Version="10.0.1" />
   </ItemGroup>
 </Project>

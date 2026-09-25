@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Common\PayNexa.Common.csproj" />
     <ProjectReference Include="..\Transaction.Contracts\Transaction.Contracts.csproj" />
     <ProjectReference Include="..\Transaction.Domain\Transaction.Domain.csproj" />
