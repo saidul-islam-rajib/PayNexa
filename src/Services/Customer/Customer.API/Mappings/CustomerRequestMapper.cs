@@ -6,6 +6,7 @@ using PayNexa.Customers.Application.Commands.RegisterCustomer;
 using PayNexa.Customers.Application.Commands.RejectCustomerKyc;
 using PayNexa.Customers.Application.Commands.SuspendCustomer;
 using PayNexa.Customers.Application.Commands.UpdateCustomerProfile;
+using PayNexa.Customers.Application.Queries.GetCustomerByEmail;
 using PayNexa.Customers.Application.Queries.ListCustomers;
 using PayNexa.Customers.Contracts.Requests;
 using Riok.Mapperly.Abstractions;
@@ -28,6 +29,8 @@ internal static partial class CustomerRequestMapper
     public static partial CloseCustomerCommand ToCloseCommand(this CustomerStatusChangeRequest request, Guid customerId);
 
     public static partial RejectCustomerKycCommand ToRejectKycCommand(this CustomerStatusChangeRequest request, Guid customerId);
+
+    public static partial GetCustomerByEmailQuery ToQuery(this CustomerLookupRequest request);
 
     public static ListCustomersQuery ToQuery(this ListCustomersRequest request) =>
         new(request.ToPageRequest(), request.Search, request.Status, request.KycStatus, request.SortBy, request.SortOrder);

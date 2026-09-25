@@ -43,7 +43,7 @@ flowchart LR
 | `Customer.Application` | 9 commands (shared `CustomerCommandHandler<T>` base), 4 queries, validators, `CustomerIntegrationEventHandler` (domain → integration events), Mapperly `CustomerMapper`, `CustomerOptions`, `AddApplication()` |
 | `Customer.Infrastructure` | `CustomerDbContext` + configuration + migrations, repository, seeder; MongoDB read model, read store, indexes, projection, Mapperly `CustomerReadModelMapper`; Kafka publishing; `AddInfrastructure()` |
 | `Customer.Contracts` | Request bodies, `CustomerResponse`, `PaymentEligibilityResponse`, `AddressDto`, integration events with `CustomerSnapshot` |
-| `Customer.API` | `Controllers/V1/CustomersController`, `Requests/ListCustomersRequest`, Mapperly `CustomerRequestMapper`, `DependencyInjection.cs`, `Program.cs` |
+| `Customer.API` | `Controllers/V1/CustomersController` (partials: queries, `.Profile`, `.Status`, `.Kyc`), `Routing/CustomerRoutes`, `Requests/ListCustomersRequest` + `CustomerLookupRequest`, Mapperly `CustomerRequestMapper`, `DependencyInjection.cs`, `Program.cs` |
 
 ---
 

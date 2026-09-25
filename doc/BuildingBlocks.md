@@ -133,33 +133,42 @@ Entity configurations therefore only describe what is specific (lengths, indexes
 
 ### 3.1 Controllers
 
+One controller per resource, split into partial files by concern: `CustomersController.cs` (queries), `.Profile.cs`, `.Status.cs`, `.Kyc.cs`. Actions are one-liners: map the request, send it, and let the base turn the `Result` into HTTP.
+
 ```csharp
 namespace PayNexa.Customers.API.Controllers.V1;
 
-public sealed class CustomersController(ISender sender) : ApiControllerBase
+public sealed partial class CustomersController
 {
     [HttpPost]
-    public async Task<ActionResult<CustomerResponse>> Register(RegisterCustomerRequest request, CancellationToken cancellationToken) =>
-        RespondCreated(await sender.Send(request.ToCommand(), cancellationToken), nameof(GetById), customer => new { id = customer.Id });
+    public Task<ActionResult<CustomerResponse>> Register(
+        RegisterCustomerRequest request,
+        CancellationToken cancellationToken) =>
+        CreateAsync(request.ToCommand(), nameof(GetById), customer => customer.Id, cancellationToken);
 
-    [HttpPost("{id:guid}/[action]")]
-    public async Task<ActionResult<CustomerResponse>> Suspend(Guid id, CustomerStatusChangeRequest request, CancellationToken cancellationToken) =>
-        Respond(await sender.Send(request.ToSuspendCommand(id), cancellationToken));
+    [HttpPost(ApiRoutes.ByIdAction)]
+    public Task<ActionResult<CustomerResponse>> Suspend(
+        Guid id,
+        CustomerStatusChangeRequest request,
+        CancellationToken cancellationToken) =>
+        CommandAsync(request.ToSuspendCommand(id), cancellationToken);
 }
 ```
 
 | Concern | Where it comes from |
 |---|---|
-| `api/v{version}/[controller]` | `[Route]` on `ApiControllerBase` |
+| `api/v{version}/[controller]` | `[Route(ApiRoutes.Resource)]` on `ApiControllerBase` |
+| Action routes | `ApiRoutes` (`ById`, `Action`, `ByIdAction`) in AspNetCore; service-specific segments in `<Service>.API/Routing` (e.g. `CustomerRoutes.Email`, `CustomerRoutes.KycAction`) — never inline strings |
 | API version | Namespace `Controllers.V1` (`VersionByNamespaceConvention`) |
 | URL casing | `KebabCaseParameterTransformer` (`PaymentEligibility` → `payment-eligibility`) and lowercase URLs |
 | Response types in OpenAPI | `ProblemDetailsResponseConvention`: success type from `ActionResult<T>`; 201 for create, 200/204 otherwise; 400 validation; 404 when the route targets a resource; 409/422 for commands; 500 always |
+| Sending | `QueryAsync` (`IQuery<Result<T>>`), `CommandAsync` (`ICommand<Result<T>>`), `CreateAsync` (201 + `Location` built from the id and current version); `ISender` is resolved by the base, so controllers have no constructor |
 | Result → HTTP | `Respond` / `RespondCreated` (`Result` failures become Problem Details) |
 
 ### 3.2 Request models
 
 - **Bodies**: records in `*.Contracts/Requests` (shared with other services).
-- **Query strings**: API-layer classes deriving from `PagedRequest` (`page`, `page-size`, `search`, `sort-by`, `sort-order`) plus service filters, e.g. `ListCustomersRequest` adds `status`, `kyc-status`.
+- **Query strings**: API-layer classes in `Requests`, bound with `[FromQuery]` and mapped to a query by Mapperly. Paged lists derive from `PagedRequest` (`page`, `page-size`, `search`, `sort-by`, `sort-order`) plus service filters, e.g. `ListCustomersRequest` adds `status`, `kyc-status`; single lookups are plain classes, e.g. `CustomerLookupRequest` (`email`).
 
 ```text
 ListCustomersRequest (API, [FromQuery])  →  ListCustomersQuery (Application)  →  handler  →  MongoDB read model
@@ -246,8 +255,10 @@ Controller → query → store:
 
 ```csharp
 [HttpGet]
-public async Task<ActionResult<PagedResult<CustomerResponse>>> List([FromQuery] ListCustomersRequest request, CancellationToken cancellationToken) =>
-    Respond(await sender.Send(request.ToQuery(), cancellationToken));
+public Task<ActionResult<PagedResult<CustomerResponse>>> List(
+    [FromQuery] ListCustomersRequest request,
+    CancellationToken cancellationToken) =>
+    QueryAsync(request.ToQuery(), cancellationToken);
 ```
 
 ```csharp
