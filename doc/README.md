@@ -62,7 +62,7 @@ The same ports apply to `dotnet run` / F5 and to Docker. Swagger opens automatic
 ### Run
 
 - **Visual Studio:** open `src/PayNexa.slnx`, set `docker-compose` as the startup project, press F5 — Customer Swagger opens.
-- **Command line:** `cd src` then `docker compose up -d --build`.
+- **Command line (from the repository root):** `docker compose up -d --build` builds every image and starts the whole stack. The root `compose.yaml` includes `src/docker-compose.yml` + `src/docker-compose.override.yml` and reads `src/.env`. Stop with `docker compose down`.
 
 The stack runs as the Docker Compose project `paynexa` (`name:` in `docker-compose.yml`, `DockerComposeProjectName` in `docker-compose.dcproj`), so Visual Studio and the command line share the same containers and the `paynexa_*` volumes.
 
