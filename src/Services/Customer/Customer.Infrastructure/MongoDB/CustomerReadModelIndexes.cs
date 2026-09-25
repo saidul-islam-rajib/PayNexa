@@ -13,11 +13,16 @@ internal sealed class CustomerReadModelIndexes : IMongoIndexDefinition
 
         return database.GetCollection<CustomerReadModel>(CollectionName).Indexes.CreateManyAsync(
             [
-                new CreateIndexModel<CustomerReadModel>(keys.Descending(model => model.CreatedAtUtc), new CreateIndexOptions { Name = "ix_createdAtUtc" }),
-                new CreateIndexModel<CustomerReadModel>(keys.Ascending(model => model.LastName), new CreateIndexOptions { Name = "ix_lastName" }),
-                new CreateIndexModel<CustomerReadModel>(keys.Ascending(model => model.FirstName), new CreateIndexOptions { Name = "ix_firstName" }),
-                new CreateIndexModel<CustomerReadModel>(keys.Ascending(model => model.Email), new CreateIndexOptions { Name = "ix_email" }),
+                Index(keys.Descending(model => model.CreatedAtUtc), "ix_createdAtUtc"),
+                Index(keys.Descending(model => model.UpdatedAtUtc), "ix_updatedAtUtc"),
+                Index(keys.Ascending(model => model.LastName), "ix_lastName"),
+                Index(keys.Ascending(model => model.FirstName), "ix_firstName"),
+                Index(keys.Ascending(model => model.Email), "ix_email"),
+                Index(keys.Ascending(model => model.Status).Ascending(model => model.KycStatus), "ix_status_kycStatus"),
             ],
             cancellationToken);
     }
+
+    private static CreateIndexModel<CustomerReadModel> Index(IndexKeysDefinition<CustomerReadModel> keys, string name) =>
+        new(keys, new CreateIndexOptions { Name = name });
 }

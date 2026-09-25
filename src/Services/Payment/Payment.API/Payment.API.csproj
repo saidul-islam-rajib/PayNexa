@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>PayNexa.Payments.API</RootNamespace>
+    <UserSecretsId>paynexa-payment-api</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..\..\..\..</DockerfileContext>
     <DockerComposeProjectPath>..\..\..\docker-compose.dcproj</DockerComposeProjectPath>

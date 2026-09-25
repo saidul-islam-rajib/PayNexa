@@ -1,20 +1,12 @@
+using PayNexa.Messaging.Abstractions;
+
 namespace PayNexa.Customers.Contracts.Events;
 
+[IntegrationEvent(CustomerEventTypes.Created, version: 1)]
 public sealed record CustomerCreatedIntegrationEvent(
     Guid EventId,
     DateTime OccurredAtUtc,
-    Guid CustomerId,
-    string FirstName,
-    string LastName,
-    string Email,
-    string PhoneNumber,
-    DateOnly DateOfBirth,
-    string Status,
-    DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc,
-    long Version)
+    CustomerSnapshot Customer) : IIntegrationEvent
 {
-    public const string EventType = "customer.created";
-
-    public int EventVersion { get; init; } = 1;
+    public string PartitionKey => Customer.Id.ToString();
 }

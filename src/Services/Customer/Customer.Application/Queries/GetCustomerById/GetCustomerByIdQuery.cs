@@ -1,7 +1,7 @@
 using Mediator;
-using PayNexa.Common.Results;
 using PayNexa.Customers.Contracts.Responses;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.Customers.Application.Queries.GetCustomerById;
 
-public sealed record GetCustomerByIdQuery(Guid Id) : IQuery<Result<CustomerResponse>>;
+public sealed record GetCustomerByIdQuery(Guid CustomerId) : IQuery<Result<CustomerResponse>>;

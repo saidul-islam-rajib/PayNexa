@@ -14,18 +14,18 @@ namespace PayNexa.Observability;
 
 public static class ObservabilityExtensions
 {
-    private static readonly PathString[] UntracedPaths = ["/health", "/openapi", "/scalar"];
+    private static readonly PathString[] UntracedPaths = ["/health", "/openapi", "/swagger"];
 
-    public static IHostApplicationBuilder AddPayNexaObservability(this IHostApplicationBuilder builder)
+    public static IServiceCollection AddPayNexaObservability(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        var identity = ServiceIdentity.From(builder);
-        var options = builder.Configuration.GetSection(ObservabilityOptions.SectionName).Get<ObservabilityOptions>()
+        var identity = ServiceIdentity.From(configuration, environment);
+        var options = configuration.GetSection(ObservabilityOptions.SectionName).Get<ObservabilityOptions>()
                       ?? new ObservabilityOptions();
 
-        builder.Services.AddSingleton<ServiceCallMetrics>();
-        builder.Services.AddPayNexaHealthChecks();
+        services.AddSingleton<ServiceCallMetrics>();
+        services.AddPayNexaHealthChecks();
 
-        builder.Services.AddOpenTelemetry()
+        services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
                 .AddService(identity.Name, serviceVersion: identity.Version)
                 .AddAttributes([new KeyValuePair<string, object>("deployment.environment.name", identity.Environment)]))
@@ -55,7 +55,7 @@ public static class ObservabilityExtensions
                 }
             });
 
-        return builder;
+        return services;
     }
 
     private static void ConfigureExporter(OtlpExporterOptions exporter, Uri endpoint, string? headers)

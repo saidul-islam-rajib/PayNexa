@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
+using PayNexa.Common.Initialization;
 using PayNexa.Common.Logging;
 
 namespace PayNexa.MongoDb.Indexes;
@@ -9,25 +9,28 @@ internal sealed partial class MongoIndexInitializer(
     IMongoDatabase database,
     IEnumerable<IMongoIndexDefinition> definitions,
     ILogger<MongoIndexInitializer> logger)
-    : BackgroundService
+    : IInfrastructureInitializer
 {
-    private const int MaxAttempts = 10;
+    private const int MaxAttempts = 12;
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(5);
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    public int Order => InitializationOrder.ReadStore;
+
+    public string Name => $"MongoDB {database.DatabaseNamespace.DatabaseName} collections and indexes";
+
+    public async Task InitializeAsync(CancellationToken cancellationToken)
     {
-        using var operation = OperationContext.Begin("MongoIndexInitialization");
-
         foreach (var definition in definitions)
         {
-            await EnsureWithRetryAsync(definition, stoppingToken);
+            await EnsureWithRetryAsync(definition, cancellationToken);
         }
     }
 
     private async Task EnsureWithRetryAsync(IMongoIndexDefinition definition, CancellationToken cancellationToken)
     {
-        for (var attempt = 1; attempt <= MaxAttempts && !cancellationToken.IsCancellationRequested; attempt++)
+        for (var attempt = 1; ; attempt++)
         {
-            using var step = logger.BeginStep($"Ensure indexes on {definition.CollectionName}");
+            using var step = logger.BeginStep($"Ensure collection and indexes on {definition.CollectionName}");
 
             try
             {
@@ -35,18 +38,16 @@ internal sealed partial class MongoIndexInitializer(
                 step.Succeeded();
                 return;
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (attempt < MaxAttempts && exception is not OperationCanceledException)
             {
-                step.Failed(exception, attempt == MaxAttempts ? LogLevel.Error : LogLevel.Warning);
+                step.Failed(exception);
+                LogRetry(logger, definition.CollectionName, attempt, MaxAttempts, RetryDelay.TotalSeconds);
+                await Task.Delay(RetryDelay, cancellationToken);
             }
-
-            await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, attempt))), cancellationToken);
         }
-
-        LogGaveUp(logger, definition.CollectionName, MaxAttempts);
     }
 
-    [LoggerMessage(EventId = LogEventIds.MongoDb + 10, Level = LogLevel.Error,
-        Message = "Gave up ensuring indexes on {Collection} after {Attempts} attempts; queries may be slow until the service restarts")]
-    private static partial void LogGaveUp(ILogger logger, string collection, int attempts);
+    [LoggerMessage(EventId = LogEventIds.MongoDb + 10, Level = LogLevel.Warning,
+        Message = "MongoDB not ready for {Collection} (attempt {Attempt}/{MaxAttempts}); retrying in {RetryDelaySeconds} s")]
+    private static partial void LogRetry(ILogger logger, string collection, int attempt, int maxAttempts, double retryDelaySeconds);
 }

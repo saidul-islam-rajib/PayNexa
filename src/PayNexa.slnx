@@ -14,6 +14,8 @@
     <Project Path="ApiGateway/PayNexa.ApiGateway/PayNexa.ApiGateway.csproj" />
   </Folder>
   <Folder Name="/BuildingBlocks/">
+    <Project Path="BuildingBlocks/PayNexa.Messaging.Abstractions/PayNexa.Messaging.Abstractions.csproj" />
+    <Project Path="BuildingBlocks/PayNexa.SharedKernel/PayNexa.SharedKernel.csproj" />
     <Project Path="BuildingBlocks/PayNexa.AspNetCore/PayNexa.AspNetCore.csproj" />
     <Project Path="BuildingBlocks/PayNexa.Caching/PayNexa.Caching.csproj" />
     <Project Path="BuildingBlocks/PayNexa.Common/PayNexa.Common.csproj" />

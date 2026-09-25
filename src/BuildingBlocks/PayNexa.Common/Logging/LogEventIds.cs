@@ -9,5 +9,6 @@ public static class LogEventIds
     public const int MongoDb = 4000;
     public const int Redis = 4100;
     public const int SqlServer = 4200;
+    public const int Kafka = 4300;
     public const int Exception = 5000;
 }

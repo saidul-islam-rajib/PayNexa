@@ -17,45 +17,21 @@ internal sealed class CustomerProjectionHandler(
       IOutboxMessageHandler<CustomerUpdatedIntegrationEvent>
 {
     public Task HandleAsync(CustomerCreatedIntegrationEvent message, CancellationToken cancellationToken) =>
-        ProjectAsync(new CustomerReadModel
-        {
-            Id = message.CustomerId,
-            FirstName = message.FirstName,
-            LastName = message.LastName,
-            Email = message.Email,
-            PhoneNumber = message.PhoneNumber,
-            DateOfBirth = message.DateOfBirth,
-            Status = message.Status,
-            CreatedAtUtc = message.CreatedAtUtc,
-            UpdatedAtUtc = message.UpdatedAtUtc,
-            Version = message.Version,
-        }, cancellationToken);
+        ProjectAsync(message.Customer, cancellationToken);
 
     public Task HandleAsync(CustomerUpdatedIntegrationEvent message, CancellationToken cancellationToken) =>
-        ProjectAsync(new CustomerReadModel
-        {
-            Id = message.CustomerId,
-            FirstName = message.FirstName,
-            LastName = message.LastName,
-            Email = message.Email,
-            PhoneNumber = message.PhoneNumber,
-            DateOfBirth = message.DateOfBirth,
-            Status = message.Status,
-            CreatedAtUtc = message.CreatedAtUtc,
-            UpdatedAtUtc = message.UpdatedAtUtc,
-            Version = message.Version,
-        }, cancellationToken);
+        ProjectAsync(message.Customer, cancellationToken);
 
-    private async Task ProjectAsync(CustomerReadModel readModel, CancellationToken cancellationToken)
+    private async Task ProjectAsync(CustomerSnapshot snapshot, CancellationToken cancellationToken)
     {
         using (var step = logger.BeginStep("Project customer to read store")
-                   .WithProperty("CustomerId", readModel.Id)
-                   .WithProperty("CustomerVersion", readModel.Version))
+                   .WithProperty("CustomerId", snapshot.Id)
+                   .WithProperty("CustomerVersion", snapshot.Version))
         {
-            var applied = await customers.UpsertIfNewerAsync(readModel, cancellationToken);
+            var applied = await customers.UpsertIfNewerAsync(snapshot.ToReadModel(), cancellationToken);
             step.WithProperty("ProjectionApplied", applied).Succeeded();
         }
 
-        await cache.RemoveAsync(CustomerCacheKeys.Profile(readModel.Id), cancellationToken);
+        await cache.RemoveAsync(CustomerCacheKeys.Profile(snapshot.Id), cancellationToken);
     }
 }

@@ -1,7 +1,6 @@
-using PayNexa.AspNetCore;
-using PayNexa.Common.Behaviors;
+using PayNexa.AspNetCore.Initialization;
+using PayNexa.Customers.API;
 using PayNexa.Customers.Application;
-using PayNexa.Customers.Application.Commands.CreateCustomer;
 using PayNexa.Customers.Infrastructure;
 using PayNexa.Logging;
 using Serilog;
@@ -11,22 +10,19 @@ Log.Logger = PayNexaLogging.CreateBootstrapLogger();
 try
 {
     var builder = WebApplication.CreateBuilder(args);
-
-    builder.AddPayNexaServiceDefaults();
-    builder.Services.AddMediator(options =>
     {
-        options.ServiceLifetime = ServiceLifetime.Scoped;
-        options.Assemblies = [typeof(CreateCustomerCommand)];
-        options.PipelineBehaviors = [typeof(LoggingBehavior<,>), typeof(ValidationBehavior<,>)];
-    });
-    builder.Services.AddCustomerApplication();
-    builder.AddCustomerInfrastructure();
+        builder.Services
+            .AddPresentation(builder.Configuration, builder.Environment)
+            .AddApplication()
+            .AddInfrastructure(builder.Configuration);
+    }
 
     var app = builder.Build();
-
-    app.UsePayNexaServiceDefaults();
-    await app.ApplyCustomerDatabaseMigrationsAsync();
-    await app.RunAsync();
+    {
+        app.UsePresentation();
+        await app.InitializeInfrastructureAsync();
+        await app.RunAsync();
+    }
 
     return 0;
 }

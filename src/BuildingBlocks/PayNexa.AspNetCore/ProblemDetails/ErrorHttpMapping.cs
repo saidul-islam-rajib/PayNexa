@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Http;
-using PayNexa.Common.Results;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.AspNetCore.ProblemDetails;
 
@@ -19,13 +19,13 @@ public static class ErrorHttpMapping
 
     public static string TitleFor(ErrorType type) => type switch
     {
-        ErrorType.Validation => "Validation failed",
-        ErrorType.Unauthorized => "Authentication required",
-        ErrorType.Forbidden => "Access denied",
-        ErrorType.NotFound => "Resource not found",
-        ErrorType.Conflict => "Request conflicts with the current state",
-        ErrorType.BusinessRule => "Business rule violated",
-        ErrorType.Unavailable => "Service temporarily unavailable",
-        _ => "Unexpected error",
+        ErrorType.Validation => CommonErrorMessages.TitleValidation,
+        ErrorType.Unauthorized => CommonErrorMessages.TitleUnauthorized,
+        ErrorType.Forbidden => CommonErrorMessages.TitleForbidden,
+        ErrorType.NotFound => CommonErrorMessages.TitleNotFound,
+        ErrorType.Conflict => CommonErrorMessages.TitleConflict,
+        ErrorType.BusinessRule => CommonErrorMessages.TitleBusinessRule,
+        ErrorType.Unavailable => CommonErrorMessages.TitleUnavailable,
+        _ => CommonErrorMessages.TitleUnexpected,
     };
 }

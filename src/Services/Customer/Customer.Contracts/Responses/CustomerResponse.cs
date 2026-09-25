@@ -1,3 +1,5 @@
+using PayNexa.Customers.Contracts.Common;
+
 namespace PayNexa.Customers.Contracts.Responses;
 
 public sealed record CustomerResponse(
@@ -7,6 +9,12 @@ public sealed record CustomerResponse(
     string Email,
     string PhoneNumber,
     DateOnly DateOfBirth,
+    AddressDto? Address,
     string Status,
+    string? StatusReason,
+    string KycStatus,
+    string? KycRejectionReason,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    string CreatedBy,
+    DateTime UpdatedAtUtc,
+    string UpdatedBy);

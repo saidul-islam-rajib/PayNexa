@@ -1,45 +1,72 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using PayNexa.Customers.Domain.Entities;
-using PayNexa.Customers.Domain.ValueObjects;
+using PayNexa.Customers.Domain.CustomerAggregate;
+using PayNexa.Customers.Domain.CustomerAggregate.ValueObjects;
 
 namespace PayNexa.Customers.Infrastructure.Persistence.Configurations;
 
 internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 {
-    private const int StatusMaxLength = 20;
+    private const string TableName = "Customers";
+    private const int EnumMaxLength = 20;
 
     public void Configure(EntityTypeBuilder<Customer> builder)
     {
-        builder.ToTable("Customers");
+        ConfigureCustomersTable(builder);
+        ConfigureName(builder);
+        ConfigureContactDetails(builder);
+        ConfigureAddress(builder);
+        ConfigureLifecycle(builder);
+    }
+
+    private static void ConfigureCustomersTable(EntityTypeBuilder<Customer> builder)
+    {
+        builder.ToTable(TableName);
         builder.HasKey(customer => customer.Id);
         builder.Property(customer => customer.Id).ValueGeneratedNever();
+        builder.Property(customer => customer.DateOfBirth).HasColumnType("date");
+        builder.HasIndex(customer => customer.CreatedAtUtc);
+    }
 
-        builder.Property(customer => customer.FirstName).HasMaxLength(Customer.NameMaxLength).IsRequired();
-        builder.Property(customer => customer.LastName).HasMaxLength(Customer.NameMaxLength).IsRequired();
+    private static void ConfigureName(EntityTypeBuilder<Customer> builder) =>
+        builder.ComplexProperty(customer => customer.Name, name =>
+        {
+            name.Property(value => value.FirstName)
+                .HasColumnName(nameof(PersonName.FirstName))
+                .HasMaxLength(PersonName.MaxLength)
+                .IsRequired();
 
-        builder.Property(customer => customer.Email)
-            .HasConversion(email => email.Value, value => Email.Create(value))
-            .HasMaxLength(Email.MaxLength)
-            .IsRequired();
+            name.Property(value => value.LastName)
+                .HasColumnName(nameof(PersonName.LastName))
+                .HasMaxLength(PersonName.MaxLength)
+                .IsRequired();
+        });
+
+    private static void ConfigureContactDetails(EntityTypeBuilder<Customer> builder)
+    {
+        builder.Property(customer => customer.Email).HasMaxLength(Email.MaxLength).IsRequired();
         builder.HasIndex(customer => customer.Email).IsUnique();
 
-        builder.Property(customer => customer.PhoneNumber)
-            .HasConversion(phone => phone.Value, value => PhoneNumber.Create(value))
-            .HasMaxLength(PhoneNumber.MaxLength)
-            .IsRequired();
+        builder.Property(customer => customer.PhoneNumber).HasMaxLength(PhoneNumber.MaxLength).IsRequired();
+    }
 
-        builder.Property(customer => customer.DateOfBirth).HasColumnType("date");
+    private static void ConfigureAddress(EntityTypeBuilder<Customer> builder) =>
+        builder.OwnsOne(customer => customer.Address, address =>
+        {
+            address.Property(value => value.Line1).HasColumnName("AddressLine1").HasMaxLength(Address.LineMaxLength);
+            address.Property(value => value.Line2).HasColumnName("AddressLine2").HasMaxLength(Address.LineMaxLength);
+            address.Property(value => value.City).HasColumnName("AddressCity").HasMaxLength(Address.CityMaxLength);
+            address.Property(value => value.State).HasColumnName("AddressState").HasMaxLength(Address.StateMaxLength);
+            address.Property(value => value.PostalCode).HasColumnName("AddressPostalCode").HasMaxLength(Address.PostalCodeMaxLength);
+            address.Property(value => value.CountryCode).HasColumnName("AddressCountryCode").HasMaxLength(Address.CountryCodeLength).IsFixedLength();
+        });
 
-        builder.Property(customer => customer.Status)
-            .HasConversion<string>()
-            .HasMaxLength(StatusMaxLength)
-            .IsRequired();
-
-        builder.Property(customer => customer.CreatedAtUtc).HasColumnType("datetime2(3)");
-        builder.Property(customer => customer.UpdatedAtUtc).HasColumnType("datetime2(3)");
-        builder.Property(customer => customer.Version).IsConcurrencyToken();
-
-        builder.HasIndex(customer => customer.CreatedAtUtc);
+    private static void ConfigureLifecycle(EntityTypeBuilder<Customer> builder)
+    {
+        builder.Property(customer => customer.Status).HasConversion<string>().HasMaxLength(EnumMaxLength).IsRequired();
+        builder.Property(customer => customer.StatusReason).HasMaxLength(StatusReason.MaxLength);
+        builder.Property(customer => customer.KycStatus).HasConversion<string>().HasMaxLength(EnumMaxLength).IsRequired();
+        builder.Property(customer => customer.KycRejectionReason).HasMaxLength(StatusReason.MaxLength);
+        builder.HasIndex(customer => new { customer.Status, customer.KycStatus });
     }
 }

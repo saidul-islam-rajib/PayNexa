@@ -5,6 +5,8 @@ namespace PayNexa.Caching;
 
 internal sealed class RedisHealthCheck(IConnectionMultiplexer redis) : IHealthCheck
 {
+    public const string DegradedDescription = "Redis is unreachable; reads fall back to the read store.";
+
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try
@@ -14,7 +16,7 @@ internal sealed class RedisHealthCheck(IConnectionMultiplexer redis) : IHealthCh
         }
         catch (Exception exception) when (exception is RedisException or TimeoutException)
         {
-            return HealthCheckResult.Degraded("Redis is unreachable; reads fall back to the read store.", exception);
+            return HealthCheckResult.Degraded(DegradedDescription, exception);
         }
     }
 }

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using PayNexa.Customers.Domain.Entities;
+using PayNexa.Customers.Domain.CustomerAggregate;
 using PayNexa.SqlServer.Conventions;
 using PayNexa.SqlServer.Outbox;
 
@@ -18,7 +18,9 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.ApplySingleValueObjectConversions();
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CustomerDbContext).Assembly);
+        modelBuilder.ApplyAuditingConventions();
         modelBuilder.ApplyOutbox();
     }
 }

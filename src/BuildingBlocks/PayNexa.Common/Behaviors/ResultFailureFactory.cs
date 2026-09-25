@@ -1,5 +1,5 @@
 using System.Reflection;
-using PayNexa.Common.Results;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.Common.Behaviors;
 

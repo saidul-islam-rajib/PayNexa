@@ -12,7 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\BuildingBlocks\PayNexa.Caching\PayNexa.Caching.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\PayNexa.Observability\PayNexa.Observability.csproj" />
   </ItemGroup>

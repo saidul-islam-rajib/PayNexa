@@ -5,7 +5,7 @@ namespace PayNexa.Logging.RequestLogging;
 
 internal static class RequestLogLevels
 {
-    private static readonly PathString[] InfrastructurePaths = ["/health", "/openapi", "/scalar"];
+    private static readonly PathString[] InfrastructurePaths = ["/health", "/openapi", "/swagger"];
 
     public static bool IsInfrastructureEndpoint(PathString path) =>
         InfrastructurePaths.Any(prefix => path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase));

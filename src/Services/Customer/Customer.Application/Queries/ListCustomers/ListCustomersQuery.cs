@@ -1,16 +1,14 @@
 using Mediator;
-using PayNexa.Common.Results;
+using PayNexa.Common.Querying;
 using PayNexa.Customers.Contracts.Responses;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.Customers.Application.Queries.ListCustomers;
 
 public sealed record ListCustomersQuery(
-    int Page,
-    int PageSize,
+    PageRequest Page,
     string? Search,
+    string? Status,
+    string? KycStatus,
     string? SortBy,
-    string? SortOrder) : IQuery<Result<PagedResult<CustomerResponse>>>
-{
-    public const int MaxPageSize = 100;
-    public const int MaxSearchLength = 100;
-}
+    string? SortOrder) : IQuery<Result<PagedResult<CustomerResponse>>>;

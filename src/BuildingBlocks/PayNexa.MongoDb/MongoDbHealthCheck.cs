@@ -6,6 +6,8 @@ namespace PayNexa.MongoDb;
 
 internal sealed class MongoDbHealthCheck(IMongoDatabase database) : IHealthCheck
 {
+    public const string UnhealthyDescription = "MongoDB is unreachable.";
+
     private static readonly BsonDocument Ping = new("ping", 1);
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
@@ -17,7 +19,7 @@ internal sealed class MongoDbHealthCheck(IMongoDatabase database) : IHealthCheck
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return HealthCheckResult.Unhealthy("MongoDB is unreachable.", exception);
+            return HealthCheckResult.Unhealthy(UnhealthyDescription, exception);
         }
     }
 }

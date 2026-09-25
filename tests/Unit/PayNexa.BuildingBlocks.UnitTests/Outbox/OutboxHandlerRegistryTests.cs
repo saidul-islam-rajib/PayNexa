@@ -10,21 +10,20 @@ public sealed class OutboxHandlerRegistryTests
     public sealed record SampleEvent(Guid Id, string Name);
 
     [Fact]
-    public async Task Dispatcher_DeserializesPayloadAndInvokesEveryHandler()
+    public async Task FromServices_DiscoversHandlersAndDispatchesToEveryOne()
     {
         var first = Substitute.For<IOutboxMessageHandler<SampleEvent>>();
         var second = Substitute.For<IOutboxMessageHandler<SampleEvent>>();
-        using var services = new ServiceCollection()
+        var services = new ServiceCollection()
             .AddSingleton(first)
-            .AddSingleton(second)
-            .BuildServiceProvider();
+            .AddSingleton(second);
 
-        var registry = new OutboxHandlerRegistry();
-        registry.Register<SampleEvent>();
+        var registry = OutboxHandlerRegistry.FromServices(services);
+        await using var provider = services.BuildServiceProvider();
         var message = new SampleEvent(Guid.NewGuid(), "customer");
 
         registry.TryGetDispatcher(typeof(SampleEvent).FullName!, out var dispatch).ShouldBeTrue();
-        await dispatch!(services, JsonSerializer.Serialize(message, JsonSerializerOptions.Web), TestContext.Current.CancellationToken);
+        await dispatch!(provider, JsonSerializer.Serialize(message, JsonSerializerOptions.Web), TestContext.Current.CancellationToken);
 
         await first.Received(1).HandleAsync(message, Arg.Any<CancellationToken>());
         await second.Received(1).HandleAsync(message, Arg.Any<CancellationToken>());
@@ -32,5 +31,5 @@ public sealed class OutboxHandlerRegistryTests
 
     [Fact]
     public void TryGetDispatcher_UnknownType_ReturnsFalse() =>
-        new OutboxHandlerRegistry().TryGetDispatcher("Unknown.Type", out _).ShouldBeFalse();
+        OutboxHandlerRegistry.FromServices(new ServiceCollection()).TryGetDispatcher("Unknown.Type", out _).ShouldBeFalse();
 }

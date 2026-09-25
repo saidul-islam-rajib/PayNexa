@@ -120,7 +120,7 @@ public sealed partial class OutboxProcessor<TDbContext>(
         if (!registry.TryGetDispatcher(message.Type, out var dispatch))
         {
             message.Attempts = _options.MaxAttempts;
-            message.LastError = "No outbox handler is registered for this message type.";
+            message.LastError = OutboxErrorMessages.NoHandlerRegistered;
             step.Failed(message.LastError);
             LogNoHandler(logger, messageName, message.Id);
             return;
@@ -161,7 +161,7 @@ public sealed partial class OutboxProcessor<TDbContext>(
     private static string BuildClaimSql(DbContext dbContext)
     {
         var entity = dbContext.Model.FindEntityType(typeof(OutboxMessage))
-                     ?? throw new InvalidOperationException($"{dbContext.GetType().Name} does not map the outbox. Call modelBuilder.ApplyOutbox().");
+                     ?? throw new InvalidOperationException(string.Format(OutboxErrorMessages.OutboxNotMappedFormat, dbContext.GetType().Name));
 
         var table = entity.GetSchema() is { } schema
             ? $"[{schema}].[{entity.GetTableName()}]"

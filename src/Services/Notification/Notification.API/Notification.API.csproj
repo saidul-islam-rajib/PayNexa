@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <RootNamespace>PayNexa.Notifications.API</RootNamespace>
+    <UserSecretsId>paynexa-notification-api</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..\..\..\..</DockerfileContext>
     <DockerComposeProjectPath>..\..\..\docker-compose.dcproj</DockerComposeProjectPath>

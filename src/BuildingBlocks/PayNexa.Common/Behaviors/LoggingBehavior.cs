@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PayNexa.Common.Exceptions;
 using PayNexa.Common.Logging;
-using PayNexa.Common.Results;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.Common.Behaviors;
 

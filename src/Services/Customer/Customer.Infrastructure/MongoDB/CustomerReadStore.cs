@@ -1,76 +1,73 @@
 using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using PayNexa.Common.Results;
+using PayNexa.Common.Querying;
 using PayNexa.Customers.Application.Interfaces;
 using PayNexa.Customers.Application.Queries.ListCustomers;
 using PayNexa.Customers.Contracts.Responses;
+using PayNexa.MongoDb.Querying;
 using SortDirection = PayNexa.Common.Querying.SortDirection;
 
 namespace PayNexa.Customers.Infrastructure.MongoDB;
 
 internal sealed class CustomerReadStore(IMongoCollection<CustomerReadModel> customers) : ICustomerReadStore
 {
-    public async Task<CustomerResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var customer = await customers
-            .Find(model => model.Id == id)
-            .FirstOrDefaultAsync(cancellationToken);
+    private static readonly FilterDefinitionBuilder<CustomerReadModel> Filter = Builders<CustomerReadModel>.Filter;
+    private static readonly SortDefinitionBuilder<CustomerReadModel> Sort = Builders<CustomerReadModel>.Sort;
 
-        return customer?.ToResponse();
-    }
+    public async Task<CustomerResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        (await customers.Find(model => model.Id == id).FirstOrDefaultAsync(cancellationToken))?.ToResponse();
 
-    public async Task<PagedResult<CustomerResponse>> ListAsync(CustomerListCriteria criteria, CancellationToken cancellationToken)
-    {
-        var filter = BuildFilter(criteria.Search);
+    public async Task<CustomerResponse?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) =>
+        (await customers.Find(model => model.Email == normalizedEmail).FirstOrDefaultAsync(cancellationToken))?.ToResponse();
 
-        var totalCount = await customers.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
-        var page = await customers
-            .Find(filter)
-            .Sort(BuildSort(criteria.SortBy, criteria.SortDirection))
-            .Skip((criteria.Page - 1) * criteria.PageSize)
-            .Limit(criteria.PageSize)
-            .ToListAsync(cancellationToken);
-
-        return new PagedResult<CustomerResponse>(
-            page.Select(model => model.ToResponse()).ToList(),
+    public Task<PagedResult<CustomerResponse>> ListAsync(CustomerListCriteria criteria, CancellationToken cancellationToken) =>
+        customers.ToPagedResultAsync(
+            BuildFilter(criteria),
+            BuildSort(criteria.Sort),
             criteria.Page,
-            criteria.PageSize,
-            totalCount);
-    }
+            model => model.ToResponse(),
+            cancellationToken);
 
-    private static FilterDefinition<CustomerReadModel> BuildFilter(string? search)
+    private static FilterDefinition<CustomerReadModel> BuildFilter(CustomerListCriteria criteria)
     {
-        var filter = Builders<CustomerReadModel>.Filter;
+        var filters = new List<FilterDefinition<CustomerReadModel>>();
 
-        if (search is null)
+        if (criteria.Search is not null)
         {
-            return filter.Empty;
+            var pattern = new BsonRegularExpression(Regex.Escape(criteria.Search), "i");
+            filters.Add(Filter.Or(
+                Filter.Regex(model => model.FirstName, pattern),
+                Filter.Regex(model => model.LastName, pattern),
+                Filter.Regex(model => model.Email, pattern)));
         }
 
-        var pattern = new BsonRegularExpression(Regex.Escape(search), "i");
+        if (criteria.Status is { } status)
+        {
+            filters.Add(Filter.Eq(model => model.Status, status.ToString()));
+        }
 
-        return filter.Or(
-            filter.Regex(model => model.FirstName, pattern),
-            filter.Regex(model => model.LastName, pattern),
-            filter.Regex(model => model.Email, pattern));
+        if (criteria.KycStatus is { } kycStatus)
+        {
+            filters.Add(Filter.Eq(model => model.KycStatus, kycStatus.ToString()));
+        }
+
+        return filters.Count == 0 ? Filter.Empty : Filter.And(filters);
     }
 
-    private static SortDefinition<CustomerReadModel> BuildSort(CustomerSortField field, SortDirection direction)
+    private static SortDefinition<CustomerReadModel> BuildSort(SortRequest<CustomerSortField> sort)
     {
-        var sort = Builders<CustomerReadModel>.Sort;
-        var primary = (field, direction) switch
+        var ascending = sort.Direction == SortDirection.Ascending;
+
+        var primary = sort.Field switch
         {
-            (CustomerSortField.FirstName, SortDirection.Ascending) => sort.Ascending(model => model.FirstName),
-            (CustomerSortField.FirstName, _) => sort.Descending(model => model.FirstName),
-            (CustomerSortField.LastName, SortDirection.Ascending) => sort.Ascending(model => model.LastName),
-            (CustomerSortField.LastName, _) => sort.Descending(model => model.LastName),
-            (CustomerSortField.Email, SortDirection.Ascending) => sort.Ascending(model => model.Email),
-            (CustomerSortField.Email, _) => sort.Descending(model => model.Email),
-            (_, SortDirection.Ascending) => sort.Ascending(model => model.CreatedAtUtc),
-            _ => sort.Descending(model => model.CreatedAtUtc),
+            CustomerSortField.UpdatedAt => ascending ? Sort.Ascending(model => model.UpdatedAtUtc) : Sort.Descending(model => model.UpdatedAtUtc),
+            CustomerSortField.FirstName => ascending ? Sort.Ascending(model => model.FirstName) : Sort.Descending(model => model.FirstName),
+            CustomerSortField.LastName => ascending ? Sort.Ascending(model => model.LastName) : Sort.Descending(model => model.LastName),
+            CustomerSortField.Email => ascending ? Sort.Ascending(model => model.Email) : Sort.Descending(model => model.Email),
+            _ => ascending ? Sort.Ascending(model => model.CreatedAtUtc) : Sort.Descending(model => model.CreatedAtUtc),
         };
 
-        return sort.Combine(primary, sort.Ascending(model => model.Id));
+        return Sort.Combine(primary, Sort.Ascending(model => model.Id));
     }
 }

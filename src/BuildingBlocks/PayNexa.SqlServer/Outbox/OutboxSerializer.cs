@@ -11,7 +11,7 @@ internal static class OutboxSerializer
     };
 
     public static string TypeNameOf(Type messageType) =>
-        messageType.FullName ?? throw new InvalidOperationException($"Outbox message type {messageType} has no full name.");
+        messageType.FullName ?? throw new InvalidOperationException(string.Format(OutboxErrorMessages.MissingTypeNameFormat, messageType));
 
     public static string ShortName(string typeName) => typeName[(typeName.LastIndexOf('.') + 1)..];
 }

@@ -1,3 +1,4 @@
+using PayNexa.ApiGateway.Proxy;
 using PayNexa.Logging;
 using PayNexa.Observability;
 using Serilog;
@@ -7,16 +8,20 @@ Log.Logger = PayNexaLogging.CreateBootstrapLogger();
 try
 {
     var builder = WebApplication.CreateBuilder(args);
-
-    builder.AddPayNexaLogging();
-    builder.AddPayNexaObservability();
+    {
+        builder.Services
+            .AddPayNexaLogging(builder.Configuration, builder.Environment)
+            .AddPayNexaObservability(builder.Configuration, builder.Environment)
+            .AddPayNexaReverseProxy(builder.Configuration);
+    }
 
     var app = builder.Build();
-
-    app.UsePayNexaRequestLogging();
-    app.MapPayNexaHealthChecks();
-
-    await app.RunAsync();
+    {
+        app.UsePayNexaRequestLogging();
+        app.MapPayNexaHealthChecks();
+        app.MapReverseProxy();
+        await app.RunAsync();
+    }
 
     return 0;
 }

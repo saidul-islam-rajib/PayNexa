@@ -4,7 +4,9 @@ public sealed class SqlServerOptions
 {
     public const string SectionName = "SqlServer";
 
-    public bool ApplyMigrationsOnStartup { get; set; }
+    public bool? ApplyMigrationsOnStartup { get; set; }
+
+    public string? Password { get; set; }
 
     public int MaxRetryCount { get; set; } = 5;
 

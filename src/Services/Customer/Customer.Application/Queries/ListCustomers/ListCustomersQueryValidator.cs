@@ -1,4 +1,6 @@
 using FluentValidation;
+using PayNexa.Common.Querying;
+using PayNexa.Customers.Domain.CustomerAggregate.Enums;
 
 namespace PayNexa.Customers.Application.Queries.ListCustomers;
 
@@ -8,14 +10,11 @@ public sealed class ListCustomersQueryValidator : AbstractValidator<ListCustomer
     {
         RuleLevelCascadeMode = CascadeMode.Stop;
 
-        RuleFor(query => query.Page).GreaterThanOrEqualTo(1);
-        RuleFor(query => query.PageSize).InclusiveBetween(1, ListCustomersQuery.MaxPageSize);
-        RuleFor(query => query.Search).MaximumLength(ListCustomersQuery.MaxSearchLength);
-        RuleFor(query => query.SortBy)
-            .Must(value => CustomerSortOptions.TryParseField(value, out _))
-            .WithMessage($"'{{PropertyName}}' must be one of: {string.Join(", ", CustomerSortOptions.SortByValues)}.");
-        RuleFor(query => query.SortOrder)
-            .Must(value => CustomerSortOptions.TryParseDirection(value, out _))
-            .WithMessage($"'{{PropertyName}}' must be one of: {string.Join(", ", CustomerSortOptions.SortOrderValues)}.");
+        this.RuleForPage(query => query.Page);
+        RuleFor(query => query.Search).ValidSearch();
+        RuleFor(query => query.Status).ValidEnumFilter<ListCustomersQuery, CustomerStatus>(CustomerQueryParameterNames.Status);
+        RuleFor(query => query.KycStatus).ValidEnumFilter<ListCustomersQuery, KycStatus>(CustomerQueryParameterNames.KycStatus);
+        RuleFor(query => query.SortBy).ValidSortField(CustomerSorting.Fields);
+        RuleFor(query => query.SortOrder).ValidSortOrder(CustomerSorting.Fields);
     }
 }

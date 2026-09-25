@@ -1,9 +1,10 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using MongoDB.Driver.Core.Events;
 using PayNexa.Common.HealthChecks;
+using PayNexa.Common.Initialization;
 using PayNexa.MongoDb.Indexes;
 using PayNexa.MongoDb.Logging;
 
@@ -11,14 +12,12 @@ namespace PayNexa.MongoDb;
 
 public static class MongoDbExtensions
 {
-    public static IHostApplicationBuilder AddPayNexaMongoDb(this IHostApplicationBuilder builder)
+    public static IServiceCollection AddPayNexaMongoDb(this IServiceCollection services, IConfiguration configuration)
     {
         MongoConventions.EnsureRegistered();
 
-        var services = builder.Services;
-
         services.AddOptions<MongoDbOptions>()
-            .BindConfiguration(MongoDbOptions.SectionName)
+            .Bind(configuration.GetSection(MongoDbOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -40,11 +39,14 @@ public static class MongoDbExtensions
         services.AddSingleton(provider => provider.GetRequiredService<IMongoClient>()
             .GetDatabase(provider.GetRequiredService<IOptions<MongoDbOptions>>().Value.DatabaseName));
 
-        services.AddHostedService<MongoIndexInitializer>();
+        services.AddSingleton<IInfrastructureInitializer, MongoIndexInitializer>();
         services.AddHealthChecks().AddCheck<MongoDbHealthCheck>("mongodb", tags: [HealthCheckTags.Ready]);
 
-        return builder;
+        return services;
     }
+
+    public static IServiceCollection AddMongoCollection<TDocument>(this IServiceCollection services, string collectionName) =>
+        services.AddSingleton(provider => provider.GetRequiredService<IMongoDatabase>().GetCollection<TDocument>(collectionName));
 
     public static IServiceCollection AddMongoIndexes<TDefinition>(this IServiceCollection services)
         where TDefinition : class, IMongoIndexDefinition =>

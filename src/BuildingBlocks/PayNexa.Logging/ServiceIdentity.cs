@@ -1,27 +1,28 @@
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using PayNexa.Common.Configuration;
 
 namespace PayNexa.Logging;
 
 public sealed record ServiceIdentity(string Name, string Version, string Environment)
 {
-    public const string NameConfigurationKey = "Service:Name";
+    public const string NameConfigurationKey = ServiceConfigurationKeys.ServiceName;
+    public const string MissingNameMessage = "Configuration value 'Service:Name' is required so every log event and trace carries its service name.";
 
-    public static ServiceIdentity From(IHostApplicationBuilder builder)
+    public static ServiceIdentity From(IConfiguration configuration, IHostEnvironment environment)
     {
-        var name = builder.Configuration[NameConfigurationKey];
+        var name = configuration[NameConfigurationKey];
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            throw new InvalidOperationException(
-                $"Configuration value '{NameConfigurationKey}' is required so every log event and trace carries its service name.");
+            throw new InvalidOperationException(MissingNameMessage);
         }
 
         var version = Assembly.GetEntryAssembly()?
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion ?? "0.0.0";
 
-        return new ServiceIdentity(name, version, builder.Environment.EnvironmentName);
+        return new ServiceIdentity(name, version, environment.EnvironmentName);
     }
 }

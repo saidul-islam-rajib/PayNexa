@@ -1,10 +1,11 @@
 using PayNexa.Common.Querying;
+using PayNexa.Customers.Domain.CustomerAggregate.Enums;
 
 namespace PayNexa.Customers.Application.Queries.ListCustomers;
 
 public sealed record CustomerListCriteria(
-    int Page,
-    int PageSize,
+    PageRequest Page,
     string? Search,
-    CustomerSortField SortBy,
-    SortDirection SortDirection);
+    CustomerStatus? Status,
+    KycStatus? KycStatus,
+    SortRequest<CustomerSortField> Sort);

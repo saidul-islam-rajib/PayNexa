@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using PayNexa.Common.Exceptions;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.AspNetCore.ProblemDetails;
 
@@ -9,26 +10,26 @@ internal sealed record ExceptionMapping(int StatusCode, string ErrorCode, string
     {
         DownstreamServiceException { FailureKind: DownstreamFailureKind.Timeout } downstream => new(
             StatusCodes.Status504GatewayTimeout,
-            "Dependency.Timeout",
-            "A dependency did not respond in time",
-            $"The {downstream.TargetService} did not respond in time. Please retry later."),
+            CommonErrorCodes.DependencyTimeout,
+            CommonErrorMessages.TitleDependencyTimeout,
+            string.Format(CommonErrorMessages.DependencyTimeoutFormat, downstream.TargetService)),
 
         DownstreamServiceException downstream => new(
             StatusCodes.Status503ServiceUnavailable,
-            "Dependency.Unavailable",
-            "A required service is unavailable",
-            $"The {downstream.TargetService} is temporarily unavailable. Please retry later."),
+            CommonErrorCodes.DependencyUnavailable,
+            CommonErrorMessages.TitleDependencyUnavailable,
+            string.Format(CommonErrorMessages.DependencyUnavailableFormat, downstream.TargetService)),
 
         BadHttpRequestException badRequest => new(
             badRequest.StatusCode,
-            "Request.Invalid",
-            "Invalid request",
-            "The request could not be processed."),
+            CommonErrorCodes.RequestInvalid,
+            CommonErrorMessages.TitleRequestInvalid,
+            CommonErrorMessages.RequestInvalid),
 
         _ => new(
             StatusCodes.Status500InternalServerError,
-            "Server.Unexpected",
-            "Unexpected error",
-            "An unexpected error occurred. Use the correlationId when contacting support."),
+            CommonErrorCodes.ServerUnexpected,
+            CommonErrorMessages.TitleUnexpected,
+            CommonErrorMessages.ServerUnexpected),
     };
 }

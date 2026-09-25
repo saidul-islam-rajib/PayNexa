@@ -10,6 +10,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="PayNexa.BuildingBlocks.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PayNexa.Common\PayNexa.Common.csproj" />
   </ItemGroup>
 

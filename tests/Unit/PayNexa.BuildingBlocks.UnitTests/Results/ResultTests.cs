@@ -1,4 +1,5 @@
-using PayNexa.Common.Results;
+using PayNexa.Common.Querying;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.BuildingBlocks.UnitTests.Results;
 

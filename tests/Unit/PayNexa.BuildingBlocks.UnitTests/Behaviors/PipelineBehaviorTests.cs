@@ -3,7 +3,7 @@ using Mediator;
 using Microsoft.Extensions.Options;
 using PayNexa.Common.Behaviors;
 using PayNexa.Common.Exceptions;
-using PayNexa.Common.Results;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.BuildingBlocks.UnitTests.Behaviors;
 

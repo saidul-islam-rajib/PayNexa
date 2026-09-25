@@ -24,6 +24,6 @@ public static class UtcDateTimeConventions
     {
         DateTimeKind.Utc => value,
         DateTimeKind.Local => value.ToUniversalTime(),
-        _ => throw new InvalidOperationException("DateTime values persisted to SQL Server must be UTC; received a value with an unspecified kind."),
+        _ => throw new InvalidOperationException(SqlServerErrorMessages.NonUtcDateTime),
     };
 }

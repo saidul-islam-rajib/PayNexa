@@ -1,34 +1,53 @@
 using System.Text.Json.Serialization;
 using Asp.Versioning;
+using Asp.Versioning.Conventions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using PayNexa.AspNetCore.Conventions;
 using PayNexa.AspNetCore.ProblemDetails;
+using PayNexa.AspNetCore.Security;
 using PayNexa.Common.Behaviors;
+using PayNexa.Common.Security;
 using PayNexa.Logging;
 using PayNexa.Observability;
-using Scalar.AspNetCore;
 
 namespace PayNexa.AspNetCore;
 
 public static class ServiceDefaults
 {
-    public static WebApplicationBuilder AddPayNexaServiceDefaults(this WebApplicationBuilder builder)
-    {
-        builder.AddPayNexaLogging();
-        builder.AddPayNexaObservability();
+    public const string SwaggerRoutePrefix = "swagger";
+    public const string OpenApiDocumentRoute = "/openapi/v1.json";
 
-        builder.Services.AddOptions<OperationLoggingOptions>()
+    public static IServiceCollection AddPayNexaServiceDefaults(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        services
+            .AddPayNexaLogging(configuration, environment)
+            .AddPayNexaObservability(configuration, environment)
+            .AddPayNexaProblemDetails();
+
+        services.AddOptions<OperationLoggingOptions>()
             .BindConfiguration(OperationLoggingOptions.SectionName)
             .ValidateOnStart();
 
-        builder.Services.AddPayNexaProblemDetails();
-        builder.Services.AddRouting(options => options.LowercaseUrls = true);
-        builder.Services
-            .AddControllers()
+        services.AddRouting(options => options.LowercaseUrls = true);
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentActor, HttpContextCurrentActor>();
+
+        services
+            .AddControllers(options =>
+            {
+                options.Conventions.Add(new RouteTokenTransformerConvention(new KebabCaseParameterTransformer()));
+                options.Conventions.Add(new ProblemDetailsResponseConvention());
+            })
             .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
-        builder.Services
+        services
             .AddApiVersioning(options =>
             {
                 options.DefaultApiVersion = new ApiVersion(1);
@@ -36,7 +55,7 @@ public static class ServiceDefaults
                 options.ReportApiVersions = true;
                 options.ApiVersionReader = new UrlSegmentApiVersionReader();
             })
-            .AddMvc()
+            .AddMvc(options => options.Conventions.Add(new VersionByNamespaceConvention()))
             .AddApiExplorer(options =>
             {
                 options.GroupNameFormat = "'v'V";
@@ -44,7 +63,7 @@ public static class ServiceDefaults
             })
             .AddOpenApi();
 
-        return builder;
+        return services;
     }
 
     public static WebApplication UsePayNexaServiceDefaults(this WebApplication app)
@@ -60,7 +79,12 @@ public static class ServiceDefaults
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi().WithDocumentPerVersion();
-            app.MapScalarApiReference();
+            app.UseSwaggerUI(options =>
+            {
+                options.RoutePrefix = SwaggerRoutePrefix;
+                options.SwaggerEndpoint(OpenApiDocumentRoute, app.Environment.ApplicationName);
+                options.DisplayRequestDuration();
+            });
         }
 
         return app;

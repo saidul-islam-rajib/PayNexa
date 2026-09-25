@@ -25,18 +25,18 @@ public static class PayNexaLogging
             .WriteTo.Console(outputTemplate: TextTemplate)
             .CreateBootstrapLogger();
 
-    public static IHostApplicationBuilder AddPayNexaLogging(this IHostApplicationBuilder builder)
+    public static IServiceCollection AddPayNexaLogging(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        var identity = ServiceIdentity.From(builder);
-        var options = builder.Configuration.GetSection(PayNexaLoggingOptions.SectionName).Get<PayNexaLoggingOptions>()
+        var identity = ServiceIdentity.From(configuration, environment);
+        var options = configuration.GetSection(PayNexaLoggingOptions.SectionName).Get<PayNexaLoggingOptions>()
                       ?? new PayNexaLoggingOptions();
 
-        builder.Services.AddSingleton(identity);
-        builder.Services.AddSerilog((services, configuration) =>
-            Configure(configuration, builder.Configuration, services, identity, options));
+        services.AddSingleton(identity);
+        services.AddSerilog((provider, loggerConfiguration) =>
+            Configure(loggerConfiguration, configuration, provider, identity, options));
 
         RegisterProcessLevelExceptionLogging();
-        return builder;
+        return services;
     }
 
     public static IApplicationBuilder UsePayNexaRequestLogging(this IApplicationBuilder app)

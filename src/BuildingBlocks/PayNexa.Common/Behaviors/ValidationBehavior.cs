@@ -2,7 +2,7 @@ using FluentValidation;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using PayNexa.Common.Logging;
-using PayNexa.Common.Results;
+using PayNexa.SharedKernel.Results;
 
 namespace PayNexa.Common.Behaviors;
 

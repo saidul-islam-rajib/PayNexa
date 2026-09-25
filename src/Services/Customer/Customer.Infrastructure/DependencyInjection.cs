@@ -1,12 +1,15 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using MongoDB.Driver;
 using PayNexa.Caching;
+using PayNexa.Common.Initialization;
+using PayNexa.Common.Persistence;
 using PayNexa.Customers.Application.Interfaces;
 using PayNexa.Customers.Contracts.Events;
 using PayNexa.Customers.Infrastructure.MongoDB;
 using PayNexa.Customers.Infrastructure.Persistence;
-using PayNexa.Customers.Infrastructure.Repositories;
+using PayNexa.Customers.Infrastructure.Persistence.Repositories;
+using PayNexa.Customers.Infrastructure.Persistence.Seed;
+using PayNexa.Messaging;
 using PayNexa.MongoDb;
 using PayNexa.SqlServer;
 
@@ -14,27 +17,41 @@ namespace PayNexa.Customers.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IHostApplicationBuilder AddCustomerInfrastructure(this IHostApplicationBuilder builder)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration) =>
+        services
+            .AddWriteStore(configuration)
+            .AddReadStore(configuration)
+            .AddCaching(configuration)
+            .AddMessaging(configuration);
+
+    private static IServiceCollection AddWriteStore(this IServiceCollection services, IConfiguration configuration)
     {
-        builder.AddPayNexaSqlServer<CustomerDbContext>(CustomerDbContext.ConnectionStringName, CustomerDbContext.Schema);
-        builder.AddPayNexaMongoDb();
-        builder.AddPayNexaRedisCache();
-
-        var services = builder.Services;
-
+        services.AddPayNexaSqlServer<CustomerDbContext>(configuration, CustomerDbContext.ConnectionStringName, CustomerDbContext.Schema);
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IDataSeeder, CustomerDataSeeder>();
 
-        services.AddSingleton(provider => provider.GetRequiredService<IMongoDatabase>()
-            .GetCollection<CustomerReadModel>(CustomerReadModel.CollectionName));
-        services.AddScoped<ICustomerReadStore, CustomerReadStore>();
+        return services;
+    }
+
+    private static IServiceCollection AddReadStore(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddPayNexaMongoDb(configuration);
+        services.AddMongoCollection<CustomerReadModel>(CustomerReadModel.CollectionName);
         services.AddMongoIndexes<CustomerReadModelIndexes>();
+        services.AddScoped<ICustomerReadStore, CustomerReadStore>();
 
         services.AddOutboxHandler<CustomerCreatedIntegrationEvent, CustomerProjectionHandler>();
         services.AddOutboxHandler<CustomerUpdatedIntegrationEvent, CustomerProjectionHandler>();
 
-        return builder;
+        return services;
     }
 
-    public static Task ApplyCustomerDatabaseMigrationsAsync(this IHost host, CancellationToken cancellationToken = default) =>
-        host.ApplyDatabaseMigrationsAsync<CustomerDbContext>(cancellationToken);
+    private static IServiceCollection AddCaching(this IServiceCollection services, IConfiguration configuration) =>
+        services.AddPayNexaRedisCache(configuration);
+
+    private static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration) =>
+        services
+            .AddPayNexaKafka(configuration)
+            .AddIntegrationEventPublishing<CustomerCreatedIntegrationEvent>()
+            .AddIntegrationEventPublishing<CustomerUpdatedIntegrationEvent>();
 }

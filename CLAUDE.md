@@ -6,6 +6,28 @@
   - Mediator (martinothamar) instead of MediatR, manual mapping or Mapster instead of AutoMapper, Shouldly instead of FluentAssertions, NSubstitute instead of Moq.
 - Write maintainable, reusable, industry-standard code that follows `doc/fintech_microservices_industry_requirements.md`.
 
+- No hard-coded user-facing text: error codes, error messages and validation messages live in constants classes (`*ErrorCodes`, `*ErrorMessages`, `ValidationMessages`) and are referenced from there.
+- Dependency injection is composed per layer, one `DependencyInjection.cs` per project: `builder.Services.AddPresentation(...).AddApplication().AddInfrastructure(builder.Configuration)`.
+- Database-agnostic architecture: Domain and Application depend only on abstractions (repositories, read stores, `IUnitOfWork`, `IOutbox`, `ICacheService`, `IEventBus`, `IDatabaseInitializer`, `IDataSeeder`); concrete stores live in Infrastructure and building blocks (Dependency Inversion).
+- Events: aggregates raise domain events; application domain-event handlers turn them into integration events through the outbox; the outbox processor projects read models and publishes to Kafka. Add events whenever a state change matters to another component.
+
+## Ports and developer experience
+| Service | HTTPS | HTTP |
+|---|---|---|
+| API Gateway | 6000 | 5000 |
+| Customer | 6001 | 5001 |
+| Authentication | 6002 | 5002 |
+| Payment | 6003 | 5003 |
+| Transaction | 6004 | 5004 |
+| Notification | 6005 | 5005 |
+
+- Same host ports locally (`launchSettings.json`) and in Docker (containers listen on 8081/8080 and are mapped to these ports).
+- Swagger UI opens automatically at `/swagger` in Development.
+- In Development, startup creates/migrates databases, collections, indexes and Kafka topics, and seeds data when the store is empty.
+
+## Docker
+- Every change to a microservice includes its Docker updates (Dockerfile, `docker-compose.yml`, `docker-compose.override.yml`, `.env.example`), and the containers are rebuilt and running on the latest code.
+
 ## Documentation
 - Every microservice has its own document in `doc/` (e.g. `doc/Customer.md`). Update it in the same change as the code.
 - Shared building blocks are documented in `doc/BuildingBlocks.md`.
