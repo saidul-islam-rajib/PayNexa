@@ -1,13 +1,53 @@
 services:
-  payment.api:
-    image: ${DOCKER_REGISTRY-}paymentapi
+  # ---- Shared infrastructure -------------------------------------------------
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+
+  mongodb:
+    image: mongo:8
+
+  redis:
+    image: redis:7-alpine
+
+  # ---- Gateway ----------------------------------------------------------------
+  paynexa.apigateway:
+    image: ${DOCKER_REGISTRY-}paynexaapigateway
     build:
-      context: .
-      dockerfile: Services/Payment/Payment.API/Dockerfile
+      context: ..
+      dockerfile: src/ApiGateway/PayNexa.ApiGateway/Dockerfile
+
+  # ---- Services ---------------------------------------------------------------
+  authentication.api:
+    image: ${DOCKER_REGISTRY-}authenticationapi
+    build:
+      context: ..
+      dockerfile: src/Services/Authentication/Authentication.API/Dockerfile
 
   customer.api:
     image: ${DOCKER_REGISTRY-}customerapi
     build:
-      context: .
-      dockerfile: Services/Customer/Customer.API/Dockerfile
+      context: ..
+      dockerfile: src/Services/Customer/Customer.API/Dockerfile
 
+  payment.api:
+    image: ${DOCKER_REGISTRY-}paymentapi
+    build:
+      context: ..
+      dockerfile: src/Services/Payment/Payment.API/Dockerfile
+
+  transaction.api:
+    image: ${DOCKER_REGISTRY-}transactionapi
+    build:
+      context: ..
+      dockerfile: src/Services/Transaction/Transaction.API/Dockerfile
+
+  notification.api:
+    image: ${DOCKER_REGISTRY-}notificationapi
+    build:
+      context: ..
+      dockerfile: src/Services/Notification/Notification.API/Dockerfile
+
+volumes:
+  sqlserver_data:
+  mongo_data:
+  redis_data:

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Common\PayNexa.Common.csproj" />
+    <ProjectReference Include="..\Transaction.Contracts\Transaction.Contracts.csproj" />
+    <ProjectReference Include="..\Transaction.Domain\Transaction.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

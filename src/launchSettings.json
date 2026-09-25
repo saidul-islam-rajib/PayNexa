@@ -4,8 +4,15 @@
       "commandName": "DockerCompose",
       "commandVersion": "1.0",
       "serviceActions": {
+        "paynexa.apigateway": "StartDebugging",
+        "authentication.api": "StartDebugging",
+        "customer.api": "StartDebugging",
         "payment.api": "StartDebugging",
-        "customer.api": "StartDebugging"
+        "transaction.api": "StartDebugging",
+        "notification.api": "StartDebugging",
+        "sqlserver": "StartWithoutDebugging",
+        "mongodb": "StartWithoutDebugging",
+        "redis": "StartWithoutDebugging"
       }
     }
   }
