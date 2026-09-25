@@ -15,7 +15,7 @@
 
 | Service | Status | HTTPS | HTTP | Swagger (Development) |
 |---|---|---|---|---|
-| API Gateway | Skeleton (logging, correlation, health) | 6000 | 5000 | — |
+| API Gateway | Routing (YARP), logging, correlation, health | 6000 | 5000 | — |
 | Customer | **Implemented** | 6001 | 5001 | https://localhost:6001/swagger |
 | Authentication | Planned | 6002 | 5002 | https://localhost:6002/swagger |
 | Payment | Planned | 6003 | 5003 | https://localhost:6003/swagger |
@@ -53,11 +53,18 @@ The same ports apply to `dotnet run` / F5 and to Docker. Swagger opens automatic
    ```
 
 3. `dotnet tool restore` (pinned `dotnet-ef`).
+4. Store the SQL password for local runs (connection strings contain no password):
+
+   ```powershell
+   dotnet user-secrets set "SqlServer:Password" "<SQL_SA_PASSWORD>" --project src/Services/Customer/Customer.API
+   ```
 
 ### Run
 
 - **Visual Studio:** open `src/PayNexa.slnx`, set `docker-compose` as the startup project, press F5 — Customer Swagger opens.
 - **Command line:** `cd src` then `docker compose up -d --build`.
+
+The stack runs as the Docker Compose project `paynexa` (`name:` in `docker-compose.yml`, `DockerComposeProjectName` in `docker-compose.dcproj`), so Visual Studio and the command line share the same containers and the `paynexa_*` volumes.
 
 In Development every service creates its databases, collections, indexes and Kafka topics on startup, and seeds data when its store is empty.
 

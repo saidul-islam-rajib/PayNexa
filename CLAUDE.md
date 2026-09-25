@@ -9,6 +9,10 @@
 - No hard-coded user-facing text: error codes, error messages and validation messages live in constants classes (`*ErrorCodes`, `*ErrorMessages`, `ValidationMessages`) and are referenced from there.
 - Dependency injection is composed per layer, one `DependencyInjection.cs` per project: `builder.Services.AddPresentation(...).AddApplication().AddInfrastructure(builder.Configuration)`.
 - Database-agnostic architecture: Domain and Application depend only on abstractions (repositories, read stores, `IUnitOfWork`, `IOutbox`, `ICacheService`, `IEventBus`, `IDatabaseInitializer`, `IDataSeeder`); concrete stores live in Infrastructure and building blocks (Dependency Inversion).
+- Common things live in one place: cross-service patterns go to `src/BuildingBlocks`, service-wide ones to the service's `Common` folder. Audit fields (`CreatedAtUtc/By`, `UpdatedAtUtc/By`) and `Version` come from `AggregateRoot<TId>` and are stamped automatically — never set them by hand. Single-value value objects and ids derive from `SingleValueObject<T>` / `StronglyTypedId` and are mapped to columns by convention.
+- Mapping uses Riok.Mapperly (compile-time, `RequiredMappingStrategy.Target`), in a `Mappings` folder per layer: API request → command/query, aggregate → response/snapshot, snapshot → read model.
+- Controllers derive from `ApiControllerBase`: no route strings for the resource (`api/v{version}/[controller]`, version from the `Controllers.V<n>` namespace, kebab-case URLs) and no `[ProducesResponseType]` (added by convention from the HTTP method). Actions return `ActionResult<T>` via `Respond` / `RespondCreated`. Query-string models derive from `PagedRequest` and live in the API layer.
+- Settings: every service has its own `appsettings.json` / `appsettings.Development.json`. Connection strings contain no password; the SQL password comes from `SqlServer:Password` (user-secrets locally, `.env` in Docker, Vault later).
 - Events: aggregates raise domain events; application domain-event handlers turn them into integration events through the outbox; the outbox processor projects read models and publishes to Kafka. Add events whenever a state change matters to another component.
 
 ## Ports and developer experience
@@ -26,6 +30,7 @@
 - In Development, startup creates/migrates databases, collections, indexes and Kafka topics, and seeds data when the store is empty.
 
 ## Docker
+- The Compose project is always named `paynexa`; containers use fixed `container_name`s.
 - Every change to a microservice includes its Docker updates (Dockerfile, `docker-compose.yml`, `docker-compose.override.yml`, `.env.example`), and the containers are rebuilt and running on the latest code.
 
 ## Documentation

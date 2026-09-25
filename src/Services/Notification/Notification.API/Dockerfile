@@ -9,12 +9,12 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /repo
 COPY . .
 WORKDIR "/repo/src/Services/Notification/Notification.API"
-RUN dotnet restore "./Notification.API.csproj"
-RUN dotnet build "./Notification.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet restore "./Notification.API.csproj"
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet build "./Notification.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Notification.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet publish "./Notification.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

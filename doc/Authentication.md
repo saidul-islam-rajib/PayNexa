@@ -1,7 +1,7 @@
 # Authentication Service
 
 **Status:** Planned — not implemented yet
-**Service name:** `authentication-service` · **Container:** `authentication.api` · **Port (compose):** `8001`
+**Service name:** `authentication-service` · **Container:** `authentication.api` · **Ports:** HTTPS `6002`, HTTP `5002`
 
 Issues and manages identities and tokens for the platform (requirements §12).
 
@@ -22,7 +22,7 @@ JWT signing keys come from HashiCorp Vault — never from appsettings, Git or im
 | MongoDB `paynexa_auth` | Read store | User profile read model |
 | Redis | Cache / short-lived state | Revoked-token list, login rate limiting (`ratelimit:auth:{clientId}`) |
 
-Passwords, password hashes, access tokens and refresh tokens are never logged; the masking enricher redacts them automatically (see [BuildingBlocks.md](BuildingBlocks.md#27-sensitive-data-requirements-44)).
+Passwords, password hashes, access tokens and refresh tokens are never logged; the masking enricher redacts them automatically (see [BuildingBlocks.md](BuildingBlocks.md#76-sensitive-data-and-correlation)).
 
 ## 3. Planned API
 

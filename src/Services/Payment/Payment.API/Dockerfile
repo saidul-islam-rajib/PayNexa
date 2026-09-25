@@ -9,12 +9,12 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /repo
 COPY . .
 WORKDIR "/repo/src/Services/Payment/Payment.API"
-RUN dotnet restore "./Payment.API.csproj"
-RUN dotnet build "./Payment.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet restore "./Payment.API.csproj"
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet build "./Payment.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Payment.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet publish "./Payment.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

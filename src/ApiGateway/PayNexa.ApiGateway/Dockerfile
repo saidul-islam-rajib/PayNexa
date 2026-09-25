@@ -9,12 +9,12 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /repo
 COPY . .
 WORKDIR "/repo/src/ApiGateway/PayNexa.ApiGateway"
-RUN dotnet restore "./PayNexa.ApiGateway.csproj"
-RUN dotnet build "./PayNexa.ApiGateway.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet restore "./PayNexa.ApiGateway.csproj"
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet build "./PayNexa.ApiGateway.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./PayNexa.ApiGateway.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN --mount=type=cache,id=paynexa-nuget,target=/root/.nuget/packages dotnet publish "./PayNexa.ApiGateway.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

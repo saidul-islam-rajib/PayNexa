@@ -71,24 +71,115 @@ finally
 Customer.Domain/
 ├── CustomerAggregate/
 │   ├── Customer.cs                          AggregateRoot<CustomerId>
-│   ├── ValueObjects/  CustomerId, PersonName, Email, PhoneNumber
-│   ├── Enums/         CustomerStatus
-│   └── Events/        CustomerRegisteredDomainEvent, CustomerProfileUpdatedDomainEvent
+│   ├── ValueObjects/  CustomerId, PersonName, Email, PhoneNumber, Address, StatusReason
+│   ├── Enums/         CustomerStatus, KycStatus
+│   ├── Policies/      CustomerPolicy (minimum age)
+│   ├── Events/        one domain event per behavior
+│   └── PaymentEligibility.cs
 └── Common/Errors/
     ├── Errors.Customer.cs                   static partial class Errors { static class Customer { ... } }
     ├── CustomerErrorCodes.cs                constants
     └── CustomerErrorMessages.cs             constants
 ```
 
-- **Aggregates** derive from `AggregateRoot<TId>`, expose behavior (`Register`, `UpdateProfile`) instead of setters, keep a `Version` for optimistic concurrency, and raise domain events with `Raise(...)`.
-- **Strongly typed IDs** derive from `StronglyTypedId` (`CustomerId.CreateUnique()`, `CustomerId.Create(guid)`).
-- **Value objects** derive from `ValueObject` (equality by components) and validate in their `Create` factory.
-- **Invariant violations** throw `DomainException(Errors.Customer.X)`. `DomainRuleBehavior` converts it into a failed `Result`, so handlers contain no try/catch for domain rules.
-- **Errors** are defined once per aggregate in `Errors.<Aggregate>` and built from `*ErrorCodes` / `*ErrorMessages` constants — no user-facing text is hard-coded anywhere else.
+SharedKernel base types:
+
+| Type | What it gives every aggregate / value object |
+|---|---|
+| `Entity<TId>` | Identity-based equality |
+| `AggregateRoot<TId>` | Domain events (`Raise`, `DequeueDomainEvents`), **`CreatedAtUtc`, `CreatedBy`, `UpdatedAtUtc`, `UpdatedBy`, `Version`** |
+| `ValueObject` | Structural equality from `GetEqualityComponents()` |
+| `SingleValueObject<T>` | One-value objects (`Email`, `PhoneNumber`, `StatusReason`) — `Value`, equality, `ToString()` |
+| `StronglyTypedId` | `SingleValueObject<Guid>` for ids (`CustomerId.CreateUnique()`, `CustomerId.Create(guid)`) |
+| `DomainException(Error)` | Invariant violation carrying a typed `Error`; `DomainRuleBehavior` turns it into a failed `Result` |
+
+- Aggregates expose behavior (`Register`, `Suspend`, `VerifyKyc`, …) instead of setters and never touch audit fields or `Version`.
+- Errors are defined once per aggregate in `Errors.<Aggregate>` from `*ErrorCodes` / `*ErrorMessages` constants.
+
+### 2.1 Automatic auditing and versioning
+
+`IUnitOfWork.SaveChangesAsync` runs `AuditStamper` **before** domain events are dispatched, so events, snapshots and API responses already see the final values:
+
+| Change | Stamped |
+|---|---|
+| Added | `CreatedAtUtc`, `CreatedBy`, `UpdatedAtUtc`, `UpdatedBy`, `Version = 1` |
+| Modified (property, owned type or raised domain event) | `UpdatedAtUtc`, `UpdatedBy`, `Version + 1` (the original value stays the concurrency check) |
+
+The actor comes from `ICurrentActor`: the JWT `sub` claim (or `anonymous`) inside an HTTP request, `system` for seeding and background work. Time comes from `TimeProvider`.
+
+### 2.2 Persistence conventions
+
+Every `DbContext` calls, in `OnModelCreating`:
+
+```csharp
+modelBuilder.HasDefaultSchema(Schema);
+modelBuilder.ApplySingleValueObjectConversions();
+modelBuilder.ApplyConfigurationsFromAssembly(typeof(CustomerDbContext).Assembly);
+modelBuilder.ApplyAuditingConventions();
+modelBuilder.ApplyOutbox();
+```
+
+| Convention | Effect |
+|---|---|
+| `ApplySingleValueObjectConversions` | Every `SingleValueObject<T>`/`StronglyTypedId` property becomes a column of `T` through a compiled converter (no per-property `HasConversion`); reading from the database bypasses re-validation |
+| `ApplyAuditingConventions` | `datetime2(3)` audit timestamps, `CreatedBy`/`UpdatedBy` `nvarchar(100)`, `Version` concurrency token, `DomainEvents` ignored |
+| `UseUtcDateTimes` (in `ConfigureConventions`) | Every `DateTime` is stored and read as UTC |
+
+Entity configurations therefore only describe what is specific (lengths, indexes, owned/complex types).
 
 ---
 
-## 3. Events
+## 3. API conventions and mapping
+
+### 3.1 Controllers
+
+```csharp
+namespace PayNexa.Customers.API.Controllers.V1;
+
+public sealed class CustomersController(ISender sender) : ApiControllerBase
+{
+    [HttpPost]
+    public async Task<ActionResult<CustomerResponse>> Register(RegisterCustomerRequest request, CancellationToken cancellationToken) =>
+        RespondCreated(await sender.Send(request.ToCommand(), cancellationToken), nameof(GetById), customer => new { id = customer.Id });
+
+    [HttpPost("{id:guid}/[action]")]
+    public async Task<ActionResult<CustomerResponse>> Suspend(Guid id, CustomerStatusChangeRequest request, CancellationToken cancellationToken) =>
+        Respond(await sender.Send(request.ToSuspendCommand(id), cancellationToken));
+}
+```
+
+| Concern | Where it comes from |
+|---|---|
+| `api/v{version}/[controller]` | `[Route]` on `ApiControllerBase` |
+| API version | Namespace `Controllers.V1` (`VersionByNamespaceConvention`) |
+| URL casing | `KebabCaseParameterTransformer` (`PaymentEligibility` → `payment-eligibility`) and lowercase URLs |
+| Response types in OpenAPI | `ProblemDetailsResponseConvention`: success type from `ActionResult<T>`; 201 for create, 200/204 otherwise; 400 validation; 404 when the route targets a resource; 409/422 for commands; 500 always |
+| Result → HTTP | `Respond` / `RespondCreated` (`Result` failures become Problem Details) |
+
+### 3.2 Request models
+
+- **Bodies**: records in `*.Contracts/Requests` (shared with other services).
+- **Query strings**: API-layer classes deriving from `PagedRequest` (`page`, `page-size`, `search`, `sort-by`, `sort-order`) plus service filters, e.g. `ListCustomersRequest` adds `status`, `kyc-status`.
+
+```text
+ListCustomersRequest (API, [FromQuery])  →  ListCustomersQuery (Application)  →  handler  →  MongoDB read model
+```
+
+### 3.3 Mapping (Riok.Mapperly)
+
+Mapperly (Apache-2.0) generates mapping code at compile time: no reflection, full IntelliSense, and — with `RequiredMappingStrategy.Target` plus warnings-as-errors — **an unmapped target member fails the build**.
+
+| Layer | Mapper | Maps |
+|---|---|---|
+| API | `CustomerRequestMapper` | HTTP request (+ route id) → command / query |
+| Application | `CustomerMapper` | Aggregate → `CustomerResponse` / `CustomerSnapshot`; value objects → primitives |
+| Infrastructure | `CustomerReadModelMapper` | Snapshot → MongoDB read model → response |
+
+Primitive → value object conversions go through the value objects' `Create` factories (validation stays in the domain).
+
+---
+
+## 4. Events
 
 ```mermaid
 flowchart LR
@@ -137,7 +228,7 @@ Consumers (inbox idempotency, retry and dead-letter topics, requirements §46) a
 
 ---
 
-## 4. Pagination and sorting
+## 5. Pagination and sorting
 
 | Type | Layer | Role |
 |---|---|---|
@@ -147,17 +238,16 @@ Consumers (inbox idempotency, retry and dead-letter topics, requirements §46) a
 | `SortFieldMap<TField>` | Common | Maps API names (`created-at`) to a typed field, with a default sort and case-insensitive parsing |
 | `QueryParameterNames` | Common | `page`, `page-size`, `sort-by`, `sort-order`, `search` — shared by binding and validation |
 | `RuleForPage`, `ValidSearch`, `ValidSortField`, `ValidSortOrder` | Common | Reusable FluentValidation rules; errors are reported under the query-parameter name |
-| `PageQueryParameters`, `SortQueryParameters` | AspNetCore | Reusable `[FromQuery]` models for controllers |
+| `PagedRequest` | AspNetCore | Base `[FromQuery]` model (`page`, `page-size`, `search`, `sort-by`, `sort-order`) for API query DTOs |
+| `ValidEnumFilter`, `ParseEnumFilter` | Common | Case-insensitive enum filters (`status=suspended`) |
 | `ToPagedResultAsync` | MongoDb / SqlServer | One call to count + page + map for MongoDB collections and EF queries |
 
-Controller → query → store in three lines:
+Controller → query → store:
 
 ```csharp
-public async Task<IActionResult> List([FromQuery] PageQueryParameters paging, [FromQuery] SortQueryParameters sorting, [FromQuery(Name = QueryParameterNames.Search)] string? search, CancellationToken ct)
-{
-    var result = await sender.Send(new ListCustomersQuery(paging.ToPageRequest(), search, sorting.SortBy, sorting.SortOrder), ct);
-    return result.IsSuccess ? Ok(result.Value) : Problem(result.Error);
-}
+[HttpGet]
+public async Task<ActionResult<PagedResult<CustomerResponse>>> List([FromQuery] ListCustomersRequest request, CancellationToken cancellationToken) =>
+    Respond(await sender.Send(request.ToQuery(), cancellationToken));
 ```
 
 ```csharp
@@ -166,7 +256,7 @@ customers.ToPagedResultAsync(filter, sort, criteria.Page, model => model.ToRespo
 
 ---
 
-## 5. Startup initialization (database-agnostic)
+## 6. Startup initialization (database-agnostic)
 
 `app.InitializeInfrastructureAsync()` runs every registered `IInfrastructureInitializer` in order, then — in Development only — every `IDataSeeder`:
 
@@ -181,9 +271,9 @@ Startup code never references EF Core, MongoDB or Kafka directly; adding a new s
 
 ---
 
-## 6. Logging
+## 7. Logging
 
-### 6.1 Sinks
+### 7.1 Sinks
 
 | Sink | Format | Purpose |
 |---|---|---|
@@ -191,11 +281,11 @@ Startup code never references EF Core, MongoDB or Kafka directly; adding a new s
 | Seq | Structured events | Search and analysis (`PayNexaLogging:SeqServerUrl`) |
 | Rolling file | Compact JSON, daily, 100 MB max, 7 files retained | Durable fallback when Seq is unreachable (`PayNexaLogging:FileDirectory`) |
 
-### 6.2 Properties on every event
+### 7.2 Properties on every event
 
 `ServiceName`, `ServiceVersion`, `Environment`, `MachineName`, `ProcessId`, `ThreadId`, `CorrelationId`, `RequestId`, `TraceId`, `SpanId`, `SourceContext`, `EventId`; commands and queries add `Operation`/`OperationKind`, steps add `Step`.
 
-### 6.3 What is logged automatically
+### 7.3 What is logged automatically
 
 | Source | Events |
 |---|---|
@@ -212,7 +302,7 @@ Startup code never references EF Core, MongoDB or Kafka directly; adding a new s
 | Resilience | retries, circuit OPENED / HALF-OPEN / CLOSED |
 | Startup | `Initialize CustomerDbContext migrations`, `Initialize Kafka topics`, `Seed Customers` |
 
-### 6.4 Steps inside a handler
+### 7.4 Steps inside a handler
 
 ```csharp
 using (var step = logger.BeginStep("Email uniqueness check"))
@@ -227,7 +317,7 @@ using (var step = logger.BeginStep("Email uniqueness check"))
 }
 ```
 
-### 6.5 Levels and event ids
+### 7.5 Levels and event ids
 
 | Level | Used for |
 |---|---|
@@ -246,14 +336,14 @@ using (var step = logger.BeginStep("Email uniqueness check"))
 | 5000 | Exceptions |
 | 10000+ | Service business events |
 
-### 6.6 Sensitive data and correlation
+### 7.6 Sensitive data and correlation
 
 - Properties named like `password`, `secret`, `token`, `apikey`, `authorization`, `credential`, `cardnumber`, `cvv`, `connectionstring`, `privatekey` are redacted; `*Email*` and `*Phone*` are partially masked — including nested objects.
 - `X-Correlation-Id` is accepted (validated) or generated, echoed in the response, added to every log event, tagged on traces, stored with outbox messages, sent as a Kafka header and forwarded on outbound HTTP calls.
 
 ---
 
-## 7. Errors and exceptions
+## 8. Errors and exceptions
 
 | `ErrorType` | HTTP |
 |---|---|
@@ -276,7 +366,7 @@ All titles and messages come from `CommonErrorMessages`, `ValidationMessages` an
 
 ---
 
-## 8. Write store, read store, cache
+## 9. Write store, read store, cache
 
 - Writes go through repositories + `IUnitOfWork` into SQL Server; `EfUnitOfWork` dispatches domain events, then saves, and translates duplicate keys / stale versions into `UniqueConstraintViolationException` / `ConcurrencyConflictException`.
 - `OutboxProcessor` claims rows with `UPDLOCK, READPAST`, runs every `IOutboxMessageHandler<T>` (projection, Kafka publisher, …), retries with exponential backoff up to 5 minutes, dead-letters after 20 attempts.
@@ -288,7 +378,7 @@ Migrations are code first (`dotnet tool restore`, then `dotnet ef migrations add
 
 ---
 
-## 9. Service-to-service calls
+## 10. Service-to-service calls
 
 ```csharp
 services.AddServiceClient<ICustomerClient, CustomerClient>("customer-service", new Uri("http://customer.api:8080"));
@@ -298,7 +388,7 @@ Pipeline: `ServiceCallLoggingHandler` → standard resilience (timeouts, retry w
 
 ---
 
-## 10. Health checks
+## 11. Health checks
 
 | Endpoint | Includes |
 |---|---|
@@ -308,7 +398,7 @@ Pipeline: `ServiceCallLoggingHandler` → standard resilience (timeouts, retry w
 
 ---
 
-## 11. Ports, Swagger and Docker
+## 12. Ports, Swagger and Docker
 
 | Service | HTTPS | HTTP | Swagger (Development) |
 |---|---|---|---|
@@ -329,12 +419,13 @@ Pipeline: `ServiceCallLoggingHandler` → standard resilience (timeouts, retry w
 
 ---
 
-## 12. Configuration reference
+## 13. Configuration reference
 
 | Key | Default | Notes |
 |---|---|---|
 | `Service:Name` | — (required) | Log events, traces, Kafka `source-service` header |
-| `ConnectionStrings:<Service>Db` | — (required) | Secret — environment/Vault only |
+| `ConnectionStrings:<Service>Db` | — (required) | Server, database and user only — **no password** (Development value in `appsettings.Development.json`) |
+| `SqlServer:Password` | — | Secret, merged into the connection string at startup: user-secrets locally (`dotnet user-secrets set SqlServer:Password <value> --project <Service>.API`), `SQL_SA_PASSWORD` from `.env` in Docker, Vault later |
 | `MongoDb:ConnectionString` / `DatabaseName` | — (required) | Validated at startup |
 | `Redis:ConnectionString` | — (required) | Validated at startup |
 | `Kafka:BootstrapServers` | — (required) | `kafka:29092` in Docker, `localhost:9092` on the host |
@@ -342,18 +433,20 @@ Pipeline: `ServiceCallLoggingHandler` → standard resilience (timeouts, retry w
 | `SqlServer:ApplyMigrationsOnStartup` | Development | Other environments migrate from CI/CD |
 | `Outbox:PollingInterval` / `BatchSize` / `MaxAttempts` / `MaxRetryDelay` | 1 s / 50 / 20 / 5 min | Validated |
 | `OperationLogging:SlowOperationThresholdMs` | 500 | |
+| `<Service>:*` | per service | Service-specific settings, e.g. `Customer:MinimumAgeYears`, `Customer:ProfileCacheTimeToLive`, `Jwt:*`, `Payment:*` — bound to validated options classes |
+| `ReverseProxy:Routes` / `Clusters` | gateway | YARP routes (`/api/v1/{auth,customers,payments,transactions}/**`) and service addresses (localhost ports in Development, container names in Docker) |
 | `PayNexaLogging:SeqServerUrl` / `ConsoleFormat` / `FileDirectory` | — / Text / temp | |
 | `Observability:OtlpTracesEndpoint` / `OtlpMetricsEndpoint` | — | Seq accepts traces at `/ingest/otlp/v1/traces` |
 
 ---
 
-## 13. Adding a new service — checklist
+## 14. Adding a new service — checklist
 
 1. Projects `src/Services/<Service>/<Service>.{API,Application,Domain,Infrastructure,Contracts}` with `<RootNamespace>PayNexa.<Services>.<Layer></RootNamespace>`.
 2. Domain: `<Name>Aggregate/` with a strongly typed id, value objects, enums, domain events; `Common/Errors/Errors.<Name>.cs` + `*ErrorCodes` + `*ErrorMessages`.
 3. Application: commands/queries returning `Result<T>`, one validator each, domain-event handlers that enqueue integration events, `AddApplication()`.
 4. Contracts: requests/responses and integration events with `[IntegrationEvent]`.
-5. Infrastructure: `DbContext` with `ApplyOutbox()` + `UseUtcDateTimes()`, repositories, read store + projections, seeder, `AddInfrastructure()` composed of write store / read store / caching / messaging.
-6. API: `DependencyInjection.cs` (`AddPresentation` / `UsePresentation`), controllers deriving `ApiControllerBase`, `launchSettings.json` on the assigned ports.
+5. Infrastructure: `DbContext` with `ApplySingleValueObjectConversions()`, `ApplyAuditingConventions()`, `ApplyOutbox()` + `UseUtcDateTimes()`, repositories, read store + projections, seeder, `AddInfrastructure()` composed of write store / read store / caching / messaging.
+6. API: `DependencyInjection.cs` (`AddPresentation` / `UsePresentation`), controllers in `Controllers/V1` deriving `ApiControllerBase` (no route strings or response attributes), query DTOs deriving `PagedRequest`, Mapperly request mappers, `launchSettings.json` on the assigned ports, service settings in `appsettings*.json`.
 7. Docker: Dockerfile, `docker-compose.yml`, `docker-compose.override.yml` (ports, environment, certificate volume), `.env.example`; rebuild and run the containers.
 8. Tests in `tests/Unit/<Service>.UnitTests`; document the service in `doc/<Service>.md`.

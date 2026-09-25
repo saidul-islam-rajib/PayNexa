@@ -4,18 +4,20 @@
 **Service name:** `customer-service` · **Container:** `customer.api` · **Ports:** HTTPS `6001`, HTTP `5001` (local and Docker)
 **Swagger (Development):** https://localhost:6001/swagger — opens automatically on F5 / `dotnet run`
 
-Owns customer profiles: registration, profile updates and customer lookup. Payment Service will call it synchronously (REST) to validate a customer before accepting a payment.
+Owns the customer (the person who pays): registration, identity verification (KYC), residential address, contact details, account lifecycle and payment eligibility. Payment Service asks this service whether a customer may pay.
 
 ---
 
 ## 1. Responsibilities
 
-- Register customers with a unique email address.
-- Update profile details (first name, last name, phone number). Email and date of birth are immutable after registration.
-- Serve customer lookups and paged, searchable, sortable customer lists.
-- Publish `customer.created` and `customer.updated` integration events to Kafka through the transactional outbox.
+- Register adult customers (configurable minimum age) with a unique email address and optional residential address.
+- Maintain profile, email and address.
+- Run the KYC lifecycle: `Pending → Verified` (requires an address) or `Pending → Rejected → Verified`.
+- Run the account lifecycle: `Active ⇄ Suspended`, `Active/Suspended → Closed` (terminal) with a mandatory reason.
+- Decide **payment eligibility** (active + KYC verified) from the source of truth.
+- Publish every change as an integration event to Kafka through the transactional outbox.
 
-Out of scope: authentication and credentials (Authentication Service), KYC documents, payments.
+Out of scope: credentials (Authentication), document storage for KYC evidence, payments.
 
 ---
 
@@ -23,24 +25,25 @@ Out of scope: authentication and credentials (Authentication Service), KYC docum
 
 ```mermaid
 flowchart LR
-    Client -->|"POST / PUT"| API["Customer.API"]
-    Client -->|"GET"| API
-    API -->|"commands"| SQL[("SQL Server CustomerDb<br/>customer.Customers<br/>customer.OutboxMessages")]
+    Client -->|"commands"| API["Customer.API"]
+    Client -->|"queries"| API
+    API -->|"write"| SQL[("SQL Server CustomerDb<br/>customer.Customers<br/>customer.OutboxMessages")]
+    API -->|"payment eligibility"| SQL
     SQL --> Outbox["Outbox processor"]
     Outbox -->|"project (version-checked)"| Mongo[("MongoDB paynexa_customer<br/>customers")]
     Outbox -->|"invalidate"| Redis[("Redis<br/>customer:{id}:profile")]
     Outbox -->|"publish"| Kafka{{"Kafka topic<br/>paynexa.customer"}}
-    API -->|"GET by id"| Redis
-    API -->|"queries"| Mongo
+    API -->|"get / list / lookup"| Redis
+    API -->|"get / list / lookup"| Mongo
 ```
 
 | Layer | Contents |
 |---|---|
-| `Customer.Domain` | `CustomerAggregate/Customer.cs` (`AggregateRoot<CustomerId>`), value objects `CustomerId`, `PersonName`, `Email`, `PhoneNumber`, enum `CustomerStatus`, domain events `CustomerRegisteredDomainEvent` and `CustomerProfileUpdatedDomainEvent`; `Common/Errors` (`Errors.Customer`, `CustomerErrorCodes`, `CustomerErrorMessages`) |
-| `Customer.Application` | Commands `CreateCustomer`, `UpdateCustomer`; queries `GetCustomerById`, `ListCustomers`; validators; domain-event handlers that enqueue integration events; `ICustomerRepository`, `ICustomerReadStore`; cache keys; `AddApplication()` |
-| `Customer.Infrastructure` | `CustomerDbContext` + EF configuration + migrations, `CustomerRepository`, `CustomerDataSeeder`; MongoDB read model, read store, indexes and projection; Kafka publishing; `AddInfrastructure()` |
-| `Customer.Contracts` | `CreateCustomerRequest`, `UpdateCustomerRequest`, `CustomerResponse`, `CustomerCreatedIntegrationEvent`, `CustomerUpdatedIntegrationEvent` |
-| `Customer.API` | `CustomersController`, `DependencyInjection.cs` (`AddPresentation` / `UsePresentation`), `Program.cs` |
+| `Customer.Domain` | `CustomerAggregate/Customer.cs` (`AggregateRoot<CustomerId>`); value objects `CustomerId`, `PersonName`, `Email`, `PhoneNumber`, `Address`, `StatusReason`; enums `CustomerStatus`, `KycStatus`; `CustomerPolicy`; `PaymentEligibility`; nine domain events; `Common/Errors` |
+| `Customer.Application` | 9 commands (shared `CustomerCommandHandler<T>` base), 4 queries, validators, `CustomerIntegrationEventHandler` (domain → integration events), Mapperly `CustomerMapper`, `CustomerOptions`, `AddApplication()` |
+| `Customer.Infrastructure` | `CustomerDbContext` + configuration + migrations, repository, seeder; MongoDB read model, read store, indexes, projection, Mapperly `CustomerReadModelMapper`; Kafka publishing; `AddInfrastructure()` |
+| `Customer.Contracts` | Request bodies, `CustomerResponse`, `PaymentEligibilityResponse`, `AddressDto`, integration events with `CustomerSnapshot` |
+| `Customer.API` | `Controllers/V1/CustomersController`, `Requests/ListCustomersRequest`, Mapperly `CustomerRequestMapper`, `DependencyInjection.cs`, `Program.cs` |
 
 ---
 
@@ -48,230 +51,176 @@ flowchart LR
 
 | Store | Role | Details |
 |---|---|---|
-| SQL Server `CustomerDb`, schema `customer` | **Write store, source of truth** | `Customers` (unique index on `Email`, index on `CreatedAtUtc`, `Version` concurrency token) and `OutboxMessages` |
-| MongoDB `paynexa_customer` | **Read store** | `customers` collection projected from the outbox; indexes on `createdAtUtc`, `lastName`, `firstName`, `email` |
-| Redis | Cache in front of the read store | `customer:{customerId:N}:profile`, TTL 10 minutes, invalidated by the projection after every change |
+| SQL Server `CustomerDb`, schema `customer` | **Write store and source of truth**; read store for payment eligibility | `Customers` (unique `Email`, index `CreatedAtUtc`, index `(Status, KycStatus)`, `Version` concurrency token, audit columns) and `OutboxMessages` |
+| MongoDB `paynexa_customer` | **Read store** | `customers` projected from the outbox; indexes on `createdAtUtc`, `updatedAtUtc`, `lastName`, `firstName`, `email`, `(status, kycStatus)` |
+| Redis | Cache in front of the read store | `customer:{customerId:N}:profile`, TTL `Customer:ProfileCacheTimeToLive`, invalidated by the projection |
 | Kafka | Integration events | Topic `paynexa.customer`, key = customer id |
-
-- Writes go to SQL Server only; a command's response is built from the write model.
-- Reads are eventually consistent (about one outbox polling interval, 1 s).
-- The service holds no monetary data.
 
 ### Customer
 
 | Field | Rules |
 |---|---|
 | `id` | `CustomerId` (UUID v7) |
-| `firstName`, `lastName` | `PersonName` value object — required, trimmed, max 100 characters each |
-| `email` | `Email` value object — valid address with a dotted domain, max 254, stored lower-case, unique |
-| `phoneNumber` | `PhoneNumber` value object — E.164, e.g. `+8801700000000` |
-| `dateOfBirth` | `1900-01-01` to today |
-| `status` | `Active` (new customers), `Suspended`, `Closed` — closed customers cannot be updated |
-| `createdAtUtc`, `updatedAtUtc` | UTC |
-| `version` (internal) | Starts at 1, incremented on every change |
+| `firstName`, `lastName` | `PersonName` — required, trimmed, max 100 each |
+| `email` | `Email` — valid, dotted domain, max 254, stored lower-case, unique |
+| `phoneNumber` | `PhoneNumber` — E.164 |
+| `dateOfBirth` | `1900-01-01` to today; at least `Customer:MinimumAgeYears` (default 18) years old |
+| `address` | `Address` — line 1, optional line 2, city, optional state, postal code, ISO 3166-1 alpha-2 country (upper-cased) |
+| `status` / `statusReason` | `Active`, `Suspended`, `Closed`; reason required for suspend/close (max 500) |
+| `kycStatus` / `kycRejectionReason` | `Pending`, `Verified`, `Rejected` |
+| `createdAtUtc`, `createdBy`, `updatedAtUtc`, `updatedBy` | Stamped automatically (`sub` claim, `anonymous`, or `system`) |
+| `version` (internal) | 1 on create, +1 on every change — concurrency and projection ordering |
 
 ### Development seed data
 
-On startup in Development, when `customer.Customers` is empty, two customers are registered through the domain model (so their events also fill MongoDB and Kafka):
+Seeded on startup in Development when `customer.Customers` is empty (through the domain, so read models and Kafka are filled too):
 
-| Id | Name | Email |
-|---|---|---|
-| `58c49479-ec65-4de2-86e7-033c546291aa` | Saidul Islam Rajib | saidul.is.rajib@gmail.com |
-| `189dc8dc-990f-48e0-a37b-e6f2b60b9d7d` | Test Customer | test@gmail.com |
+| Id | Name | Email | KYC | Eligible |
+|---|---|---|---|---|
+| `58c49479-ec65-4de2-86e7-033c546291aa` | Saidul Islam Rajib | saidul.is.rajib@gmail.com | Verified | yes |
+| `189dc8dc-990f-48e0-a37b-e6f2b60b9d7d` | Test Customer | test@gmail.com | Pending | no |
 
 ---
 
 ## 4. API
 
-Base path: `/api/v1/customers`. JSON properties are camelCase; query parameters are kebab-case (requirements §27). All errors use Problem Details with `traceId`, `correlationId` and `errorCode`. Send `X-Correlation-Id` to trace a request end to end.
+Base path `/api/v1/customers` (route and version come from the base controller and the `Controllers.V1` namespace). JSON is camelCase, query parameters kebab-case. Errors are Problem Details with `traceId`, `correlationId`, `errorCode`. Every command returns the updated `CustomerResponse`.
 
-### 4.1 Create customer
+| Method | Route | Purpose | Success | Typical errors |
+|---|---|---|---|---|
+| POST | `/` | Register | 201 + `Location` | 400, 409 `EmailAlreadyRegistered`, 422 |
+| GET | `/?page=&page-size=&search=&status=&kyc-status=&sort-by=&sort-order=` | List (read store) | 200 | 400 |
+| GET | `/{id}` | Get (cache → read store) | 200 | 404 |
+| GET | `/lookup?email=` | Find by email (read store) | 200 | 400, 404 |
+| GET | `/{id}/payment-eligibility` | Can this customer pay? (write store) | 200 | 404 |
+| PUT | `/{id}` | Update name and phone | 200 | 400, 404, 409 `Closed` / `ConcurrentModification` |
+| PUT | `/{id}/email` | Change email | 200 | 400, 404, 409 `EmailAlreadyRegistered` |
+| PUT | `/{id}/address` | Change residential address | 200 | 400, 404, 409 |
+| POST | `/{id}/suspend` | Suspend (`{ "reason": "…" }`) | 200 | 400, 404, 409 `NotActive` / `Closed` |
+| POST | `/{id}/reactivate` | Reactivate a suspended customer | 200 | 404, 409 `NotSuspended` |
+| POST | `/{id}/close` | Close permanently (`{ "reason": "…" }`) | 200 | 400, 404, 409 `Closed` |
+| POST | `/{id}/kyc/verify` | Mark identity verified | 200 | 404, 409 `KycAlreadyVerified`, 422 `AddressRequiredForKyc` |
+| POST | `/{id}/kyc/reject` | Reject identity (`{ "reason": "…" }`) | 200 | 400, 404, 409 `KycNotPending` |
 
-```http
-POST /api/v1/customers
-Content-Type: application/json
-```
+### Register
 
 ```json
 {
-  "firstName": "Saidul Islam",
-  "lastName": "Rajib",
-  "email": "saidul.is.rajib@gmail.com",
-  "phoneNumber": "+8801700000000",
-  "dateOfBirth": "1995-05-20"
+  "firstName": "Nadia",
+  "lastName": "Rahman",
+  "email": "nadia@example.com",
+  "phoneNumber": "+8801711000000",
+  "dateOfBirth": "1992-03-10",
+  "address": { "line1": "Gulshan Ave", "line2": null, "city": "Dhaka", "state": null, "postalCode": "1212", "countryCode": "bd" }
 }
 ```
 
-**201 Created** with `Location: /api/v1/customers/{id}`:
+### Customer response
 
 ```json
 {
-  "id": "01a0d775-8b75-72de-bcab-3c690216124b",
-  "firstName": "Saidul Islam",
-  "lastName": "Rajib",
-  "email": "saidul.is.rajib@gmail.com",
-  "phoneNumber": "+8801700000000",
-  "dateOfBirth": "1995-05-20",
+  "id": "01a0d92c-1476-7bf2-a97e-c02723b33032",
+  "firstName": "Nadia",
+  "lastName": "Rahman",
+  "email": "nadia@example.com",
+  "phoneNumber": "+8801711000000",
+  "dateOfBirth": "1992-03-10",
+  "address": { "line1": "Gulshan Ave", "line2": null, "city": "Dhaka", "state": null, "postalCode": "1212", "countryCode": "BD" },
   "status": "Active",
-  "createdAtUtc": "2026-09-25T07:26:39.989Z",
-  "updatedAtUtc": "2026-09-25T07:26:39.989Z"
+  "statusReason": null,
+  "kycStatus": "Pending",
+  "kycRejectionReason": null,
+  "createdAtUtc": "2026-09-25T15:25:39.992Z",
+  "createdBy": "anonymous",
+  "updatedAtUtc": "2026-09-25T15:25:39.992Z",
+  "updatedBy": "anonymous"
 }
 ```
 
-| Status | `errorCode` | When |
-|---|---|---|
-| 400 | `Validation.Failed` | Invalid fields (see `errors`) |
-| 409 | `Customer.EmailAlreadyRegistered` | Email already registered (also when a concurrent request wins the unique index) |
-| 422 | `Customer.Invalid*` | A domain rule rejected the input |
-
-### 4.2 Get customer by id
-
-```http
-GET /api/v1/customers/{id}
-```
-
-**200 OK** — same body as above (Redis, then MongoDB).
-
-| Status | `errorCode` | When |
-|---|---|---|
-| 404 | `Customer.NotFound` | Unknown id (or not yet projected, ~1 s after creation) |
-
-### 4.3 List customers
-
-```http
-GET /api/v1/customers?page=1&page-size=20&search=rajib&sort-by=created-at&sort-order=desc
-```
-
-| Parameter | Default | Rules |
-|---|---|---|
-| `page` | `1` | ≥ 1 |
-| `page-size` | `20` | 1–100 |
-| `search` | — | Case-insensitive match on first name, last name or email; max 100 characters |
-| `sort-by` | `created-at` | `created-at`, `first-name`, `last-name`, `email` (case-insensitive) |
-| `sort-order` | `desc` | `asc`, `desc` |
-
-**200 OK**
+### Payment eligibility
 
 ```json
 {
-  "items": [ { "id": "58c49479-ec65-4de2-86e7-033c546291aa", "firstName": "Saidul Islam", "…": "…" } ],
-  "page": 1,
-  "pageSize": 20,
-  "totalCount": 2,
-  "totalPages": 1,
-  "hasPreviousPage": false,
-  "hasNextPage": false
+  "customerId": "01a0d92c-1476-7bf2-a97e-c02723b33032",
+  "isEligible": false,
+  "reasons": [ { "code": "Customer.NotActive", "description": "Only an active customer can perform this operation." } ]
 }
 ```
 
-| Status | `errorCode` | When |
-|---|---|---|
-| 400 | `Validation.Failed` | Invalid paging or sorting; errors are keyed by the query parameter (`page-size`, `sort-by`, …) |
+### List
 
-### 4.4 Update customer
-
-```http
-PUT /api/v1/customers/{id}
-Content-Type: application/json
-```
+Parameters: `page` (≥ 1, default 1), `page-size` (1–100, default 20), `search` (first/last name or email, max 100), `status` (`Active|Suspended|Closed`), `kyc-status` (`Pending|Verified|Rejected`), `sort-by` (`created-at|updated-at|first-name|last-name|email`, default `created-at`), `sort-order` (`asc|desc`, default `desc`). All values are case-insensitive; validation errors are keyed by the parameter name.
 
 ```json
-{
-  "firstName": "Saidul Islam",
-  "lastName": "Rajib",
-  "phoneNumber": "+8801700000001"
-}
+{ "items": [ … ], "page": 1, "pageSize": 20, "totalCount": 2, "totalPages": 1, "hasPreviousPage": false, "hasNextPage": false }
 ```
-
-**200 OK** — the updated customer.
-
-| Status | `errorCode` | When |
-|---|---|---|
-| 400 | `Validation.Failed` | Invalid fields |
-| 404 | `Customer.NotFound` | Unknown id |
-| 409 | `Customer.ConcurrentModification` | Changed by another request in the meantime; reload and retry |
-| 422 | `Customer.Closed` | The customer is closed |
-
-### 4.5 Operational endpoints
-
-| Endpoint | Purpose |
-|---|---|
-| `/health`, `/health/live`, `/health/ready` | Health (ready = SQL Server + MongoDB + Redis + Kafka) |
-| `/openapi/v1.json`, `/swagger` | OpenAPI document and Swagger UI (Development only) |
 
 ---
 
 ## 5. Events
 
-| Domain event | Raised by | Integration event | Kafka |
-|---|---|---|---|
-| `CustomerRegisteredDomainEvent` | `Customer.Register` | `CustomerCreatedIntegrationEvent` (`customer.created`, v1) | `paynexa.customer`, key = customer id |
-| `CustomerProfileUpdatedDomainEvent` | `Customer.UpdateProfile` | `CustomerUpdatedIntegrationEvent` (`customer.updated`, v1) | `paynexa.customer`, key = customer id |
+| Domain event | Integration event | `changeType` |
+|---|---|---|
+| `CustomerRegisteredDomainEvent` | `customer.created` v1 | — |
+| `CustomerProfileUpdatedDomainEvent` | `customer.updated` v1 | `ProfileUpdated` |
+| `CustomerEmailChangedDomainEvent` | `customer.updated` v1 | `EmailChanged` |
+| `CustomerAddressChangedDomainEvent` | `customer.updated` v1 | `AddressChanged` |
+| `CustomerSuspendedDomainEvent` | `customer.updated` v1 | `Suspended` |
+| `CustomerReactivatedDomainEvent` | `customer.updated` v1 | `Reactivated` |
+| `CustomerClosedDomainEvent` | `customer.updated` v1 | `Closed` |
+| `CustomerKycVerifiedDomainEvent` | `customer.updated` v1 | `KycVerified` |
+| `CustomerKycRejectedDomainEvent` | `customer.updated` v1 | `KycRejected` |
 
-The integration event carries the full customer snapshot plus `eventId`, `occurredAtUtc` and `version`. Consumers must ignore events whose `version` is not newer than what they already hold. Headers: see [BuildingBlocks.md](BuildingBlocks.md#kafka-conventions).
+Payload: `eventId`, `occurredAtUtc`, (`changeType`,) and `customer` — a full `CustomerSnapshot` including `version`. Topic `paynexa.customer`, key = customer id, headers per [BuildingBlocks.md](BuildingBlocks.md#kafka-conventions). Consumers ignore snapshots whose `version` is not newer than theirs.
 
 ---
 
 ## 6. Logging
 
-A successful update, filtered in Seq by `CorrelationId`:
+A suspension, filtered in Seq by `CorrelationId`:
 
 ```text
-HTTP PUT /api/v1/customers/58c49479-… started
-Command UpdateCustomerCommand started
-UpdateCustomerCommand: Validation started / succeeded / ended
+HTTP POST /api/v1/customers/{id}/suspend started
+Command SuspendCustomerCommand started
+SuspendCustomerCommand: Validation started / succeeded / ended
 SQL Server SELECT on CustomerDb started / succeeded (LinqQuery)
-UpdateCustomerCommand: Persist customer to write store started
-UpdateCustomerCommand: Handle domain event CustomerProfileUpdatedDomainEvent started / succeeded / ended
-SQL Server UPDATE on CustomerDb started / succeeded (SaveChanges)
-UpdateCustomerCommand: Persist customer to write store succeeded / ended
-Customer 58c49479-… profile updated to version 2
-UpdateCustomerCommand succeeded / ended
-HTTP PUT /api/v1/customers/58c49479-… responded 200
-Outbox.CustomerUpdatedIntegrationEvent: Dispatch CustomerUpdatedIntegrationEvent started
-Outbox.CustomerUpdatedIntegrationEvent: Project customer to read store started / succeeded / ended
-Outbox.CustomerUpdatedIntegrationEvent: Redis DEL started / succeeded / ended
-Outbox.CustomerUpdatedIntegrationEvent: Kafka publish customer.updated to paynexa.customer started / succeeded (Partition, Offset) / ended
-Outbox.CustomerUpdatedIntegrationEvent: Dispatch CustomerUpdatedIntegrationEvent succeeded / ended
+SuspendCustomerCommand: Persist customer to write store started
+SuspendCustomerCommand: Handle domain event CustomerSuspendedDomainEvent started / succeeded / ended
+SQL Server UPDATE + INSERT (outbox) on CustomerDb succeeded (SaveChanges)
+SuspendCustomerCommand: Persist customer to write store succeeded / ended
+SuspendCustomerCommand applied to customer {id}; now at version 3
+SuspendCustomerCommand succeeded / ended
+HTTP POST /api/v1/customers/{id}/suspend responded 200
+Outbox.CustomerUpdatedIntegrationEvent: Project customer to read store / Redis DEL / Kafka publish customer.updated to paynexa.customer … succeeded
 ```
 
-Business events: `10001` registered, `10002` profile updated, `10003` seeded. Email and phone number are masked in every log event.
+Business event ids: `10001` registered, `10002` changed, `10003` seeded. Startup (migrations, indexes, topics, seeding) runs under its own correlation id.
 
 ---
 
 ## 7. Configuration
 
-| Key | Docker value |
-|---|---|
-| `Service:Name` | `customer-service` |
-| `ConnectionStrings:CustomerDb` | from `src/.env` (`SQL_SA_PASSWORD`) — never in appsettings |
-| `MongoDb:ConnectionString` / `DatabaseName` | `mongodb://mongodb:27017` / `paynexa_customer` |
-| `Redis:ConnectionString` | `redis:6379` |
-| `Kafka:BootstrapServers` | `kafka:29092` (`localhost:9092` when running on the host) |
-| `PayNexaLogging:SeqServerUrl` | `http://seq:5341` |
-| `Observability:OtlpTracesEndpoint` | `http://seq:5341/ingest/otlp/v1/traces` |
+| Key | Development (`appsettings.Development.json`) | Docker (`docker-compose.override.yml`) |
+|---|---|---|
+| `ConnectionStrings:CustomerDb` | `Server=localhost,1433;Database=CustomerDb;User Id=sa;…` | `Server=sqlserver;Database=CustomerDb;User Id=sa;…` |
+| `SqlServer:Password` | user-secrets (`paynexa-customer-api`) | `SQL_SA_PASSWORD` from `src/.env` |
+| `MongoDb:ConnectionString` / `DatabaseName` | `mongodb://localhost:27017` / `paynexa_customer` | `mongodb://mongodb:27017` |
+| `Redis:ConnectionString` | `localhost:6379` | `redis:6379` |
+| `Kafka:BootstrapServers` | `localhost:9092` | `kafka:29092` |
+| `Customer:MinimumAgeYears` | 18 | 18 |
+| `Customer:ProfileCacheTimeToLive` | `00:10:00` | `00:10:00` |
+| `PayNexaLogging:SeqServerUrl` | `http://localhost:5341` | `http://seq:5341` |
 
-Shared keys: [BuildingBlocks.md](BuildingBlocks.md#12-configuration-reference).
+Shared keys: [BuildingBlocks.md](BuildingBlocks.md#13-configuration-reference).
 
 ---
 
 ## 8. Running and testing
 
-**Visual Studio:** set `docker-compose` as the startup project and press F5 — Swagger opens at https://localhost:6001/swagger. Or set `Customer.API` (profile `https`) as the startup project with the infrastructure containers running.
-
-**Command line:**
-
-```powershell
-cd src
-docker compose up -d --build
-start https://localhost:6001/swagger
-```
-
-On first start in Development the service creates `CustomerDb` (migrations), the MongoDB collection and indexes, the Kafka topic `paynexa.customer`, and seeds the two customers above.
-
-Sample requests: `src/Services/Customer/Customer.API/Customer.API.http`.
-
-**Unit tests** (`tests/Unit/Customer.UnitTests`): value objects, aggregate behavior and domain events, validators (including query-parameter error keys), command handlers, domain-event handlers (integration event mapping and topic metadata), query handlers (cache, sorting, paging).
+- **Visual Studio:** start `docker-compose` (Swagger opens at https://localhost:6001/swagger), or start `Customer.API` with the `https` profile while the infrastructure containers run.
+- **Command line:** `cd src` → `docker compose up -d --build`.
+- **Sample requests:** `src/Services/Customer/Customer.API/Customer.API.http`.
+- **Unit tests** (`tests/Unit/Customer.UnitTests`, 69 tests): value objects, aggregate lifecycle (status transitions, KYC, minimum age, eligibility), validators (including query-parameter error keys), register handler, shared command handler (not found, concurrency, domain rules, email uniqueness), integration-event mapping, Mapperly mappers, queries (cache, email lookup, eligibility from the write store, filters).
 
 ```powershell
 dotnet test --solution src/PayNexa.slnx

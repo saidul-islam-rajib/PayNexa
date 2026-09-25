@@ -1,7 +1,7 @@
 # Payment Service
 
 **Status:** Planned — not implemented yet
-**Service name:** `payment-service` · **Container:** `payment.api` · **Port (compose):** `8003`
+**Service name:** `payment-service` · **Container:** `payment.api` · **Ports:** HTTPS `6003`, HTTP `5003`
 
 Accepts, validates and processes payments. It is the platform's primary demonstration flow (requirements §40).
 
@@ -24,9 +24,9 @@ Accepts, validates and processes payments. It is the platform's primary demonstr
 
 ## 3. Customer Service dependency
 
-Payment calls Customer Service through a typed client registered with `AddServiceClient<ICustomerClient, CustomerClient>("customer-service", …)` (see [BuildingBlocks.md](BuildingBlocks.md#5-service-to-service-calls-requirements-19-26)):
+Payment calls Customer Service through a typed client registered with `AddServiceClient<ICustomerClient, CustomerClient>("customer-service", …)` (see [BuildingBlocks.md](BuildingBlocks.md#10-service-to-service-calls)):
 
-- `GET /api/v1/customers/{id}` is retried with backoff; the circuit opens when Customer Service keeps failing.
+- `GET /api/v1/customers/{id}/payment-eligibility` (read from Customer's SQL Server source of truth) is retried with backoff; the circuit opens when Customer Service keeps failing.
 - An open circuit or timeout returns `503`/`504` Problem Details immediately and is logged at Error with `TargetService = customer-service`.
 - The payment itself (POST) is never retried automatically; retries rely on the idempotency key.
 - Payment defines its own small customer DTO for this call instead of referencing `Customer.Contracts`, so the services stay free of compile-time coupling.
