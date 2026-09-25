@@ -12,7 +12,8 @@
         "notification.api": "StartDebugging",
         "sqlserver": "StartWithoutDebugging",
         "mongodb": "StartWithoutDebugging",
-        "redis": "StartWithoutDebugging"
+        "redis": "StartWithoutDebugging",
+        "seq": "StartWithoutDebugging"
       }
     }
   }

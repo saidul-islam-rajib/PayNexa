@@ -1,11 +1,31 @@
+using PayNexa.Logging;
 using PayNexa.Observability;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = PayNexaLogging.CreateBootstrapLogger();
 
-builder.Services.AddPayNexaHealthChecks();
+try
+{
+    var builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
+    builder.AddPayNexaLogging();
+    builder.AddPayNexaObservability();
 
-app.MapPayNexaHealthChecks();
+    var app = builder.Build();
 
-app.Run();
+    app.UsePayNexaRequestLogging();
+    app.MapPayNexaHealthChecks();
+
+    await app.RunAsync();
+
+    return 0;
+}
+catch (Exception exception) when (exception is not HostAbortedException)
+{
+    Log.Fatal(exception, "API gateway terminated unexpectedly during startup");
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

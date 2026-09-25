@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
+    <RootNamespace>PayNexa.Payments.API</RootNamespace>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..\..\..\..</DockerfileContext>
     <DockerComposeProjectPath>..\..\..\docker-compose.dcproj</DockerComposeProjectPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Mediator.SourceGenerator">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
@@ -16,8 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Observability\PayNexa.Observability.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.AspNetCore\PayNexa.AspNetCore.csproj" />
     <ProjectReference Include="..\Payment.Application\Payment.Application.csproj" />
     <ProjectReference Include="..\Payment.Infrastructure\Payment.Infrastructure.csproj" />
   </ItemGroup>

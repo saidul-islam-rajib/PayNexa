@@ -1,13 +1,37 @@
-@Customer.API_HostAddress = http://localhost:5217
+@host = http://localhost:8002
+@customerId = 00000000-0000-0000-0000-000000000000
 
-GET {{Customer.API_HostAddress}}/health
+POST {{host}}/api/v1/customers
+Content-Type: application/json
+X-Correlation-Id: demo-create-customer-001
+
+{
+  "firstName": "Saidul Islam",
+  "lastName": "Rajib",
+  "email": "saidul.is.rajib@gmail.com",
+  "phoneNumber": "+8801700000000",
+  "dateOfBirth": "1995-05-20"
+}
 
 ###
 
-GET {{Customer.API_HostAddress}}/health/live
+GET {{host}}/api/v1/customers/{{customerId}}
 
 ###
 
-GET {{Customer.API_HostAddress}}/health/ready
+GET {{host}}/api/v1/customers?page=1&page-size=20&search=rajib&sort-by=created-at&sort-order=desc
 
 ###
+
+PUT {{host}}/api/v1/customers/{{customerId}}
+Content-Type: application/json
+
+{
+  "firstName": "Saidul Islam",
+  "lastName": "Rajib",
+  "phoneNumber": "+8801700000001"
+}
+
+###
+
+GET {{host}}/health/ready

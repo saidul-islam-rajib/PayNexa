@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Authentication.UnitTests</RootNamespace>
+    <TestingPlatformCommandLineArguments>--ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Authentication\Authentication.Application\Authentication.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Authentication\Authentication.Domain\Authentication.Domain.csproj" />

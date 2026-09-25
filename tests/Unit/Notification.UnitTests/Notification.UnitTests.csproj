@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Notifications.UnitTests</RootNamespace>
+    <TestingPlatformCommandLineArguments>--ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Notification\Notification.Application\Notification.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Notification\Notification.Domain\Notification.Domain.csproj" />

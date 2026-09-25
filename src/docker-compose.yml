@@ -1,5 +1,4 @@
 services:
-  # ---- Shared infrastructure -------------------------------------------------
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
 
@@ -9,14 +8,15 @@ services:
   redis:
     image: redis:7-alpine
 
-  # ---- Gateway ----------------------------------------------------------------
+  seq:
+    image: datalust/seq:latest
+
   paynexa.apigateway:
     image: ${DOCKER_REGISTRY-}paynexaapigateway
     build:
       context: ..
       dockerfile: src/ApiGateway/PayNexa.ApiGateway/Dockerfile
 
-  # ---- Services ---------------------------------------------------------------
   authentication.api:
     image: ${DOCKER_REGISTRY-}authenticationapi
     build:
@@ -51,3 +51,4 @@ volumes:
   sqlserver_data:
   mongo_data:
   redis_data:
+  seq_data:

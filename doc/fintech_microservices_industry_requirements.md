@@ -109,10 +109,14 @@ PayNexa/
 │   │       └── Notification.Contracts/
 │   │
 │   └── BuildingBlocks/
-│       ├── PayNexa.Common/                      (Result/Error types, ProblemDetails helpers)
-│       ├── PayNexa.Logging/                     (Serilog bootstrap, enrichers, masking)
-│       ├── PayNexa.Observability/                (OpenTelemetry setup, health check extensions)
-│       ├── PayNexa.Messaging/                   (Kafka producer/consumer + outbox contracts)
+│       ├── PayNexa.Common/                      (Result/Error types, pipeline behaviors, abstractions)
+│       ├── PayNexa.AspNetCore/                  (service defaults, ProblemDetails, exception handler, versioning)
+│       ├── PayNexa.Logging/                     (Serilog bootstrap, enrichers, masking, correlation)
+│       ├── PayNexa.Observability/                (OpenTelemetry setup, health checks, service-to-service clients)
+│       ├── PayNexa.SqlServer/                   (write store: EF Core, unit of work, transactional outbox)
+│       ├── PayNexa.MongoDb/                     (read store: read models, projections, indexes)
+│       ├── PayNexa.Caching/                     (Redis cache-aside)
+│       ├── PayNexa.Messaging/                   (Kafka producer/consumer)
 │       └── PayNexa.Vault/                       (VaultSharp client wrapper, secret providers)
 │
 ├── tests/
@@ -178,17 +182,26 @@ Notification Service has no public Gateway route — it is reachable only throug
 
 ### Data & Caching Details
 
+Every service follows the Write/Read Store rule (Section 5.1): commands write to
+SQL Server, queries read from MongoDB read models, and money is always read from SQL Server.
+
 ```text
-SQL Server (one instance, one database per service — never a shared schema):
+SQL Server — WRITE store and source of truth (one instance, one database per service,
+never a shared schema). Each database also holds that service's outbox table:
   Authentication Service  ──► AuthDb          (users, credentials, refresh tokens)
   Customer Service        ──► CustomerDb      (customer profiles)
-  Payment Service         ──► PaymentDb       (payments, outbox table)
-  Transaction Service     ──► TransactionDb   (transactions)
+  Payment Service         ──► PaymentDb       (payments, amounts — also the READ store for money)
+  Transaction Service     ──► TransactionDb   (transactions, amounts — also the READ store for money)
+  Notification Service    ──► NotificationDb  (notification requests and delivery state)
 
-MongoDB (shared cluster, one database/collection set per concern — shared
-infrastructure, never shared ownership, Section 6):
-  Payment Service         ──► PaymentMetadata      (flexible, non-relational payment data)
-  Notification Service    ──► NotificationHistory   (delivery records)
+MongoDB — READ store (shared cluster, one database per service — shared
+infrastructure, never shared ownership, Section 6). Read models are projections
+of the SQL Server state, updated from the outbox:
+  Authentication Service  ──► paynexa_auth          (user profile read model)
+  Customer Service        ──► paynexa_customer      (customer read model)
+  Payment Service         ──► paynexa_payment       (non-financial payment metadata)
+  Transaction Service     ──► paynexa_transaction   (non-financial history views)
+  Notification Service    ──► paynexa_notification  (notification history read model)
   Any service             ──► AuditEvents           (audit trail, Section 31)
 
 Redis (shared cache, namespaced keys per service, cache-aside pattern, Section 9):
@@ -348,6 +361,36 @@ Application
 │       └── GetTransactionsQueryHandler.cs
 ```
 
+## 5.1 Write and Read Stores — Mandatory
+
+CQRS is applied at the storage level as well as in code:
+
+| Operation | Store | Rule |
+|---|---|---|
+| Commands (POST / PUT / PATCH / DELETE) | **SQL Server** | The only place data is created or changed. SQL Server is the **source of truth** for every service. |
+| Queries (GET) | **MongoDB** | Served from read models (projections) of the SQL Server state. |
+| Anything involving **payments, amounts, balances or other monetary values** | **SQL Server** | Money is written **and read** from the same source of truth. Financial queries and every decision that depends on a monetary value read from SQL Server — never from a MongoDB projection or a cache. |
+
+Keeping the read store in sync:
+
+```text
+Command handler
+   │  one SQL Server transaction
+   ├──► business tables          (source of truth)
+   └──► outbox table             (change event, same transaction — Section 15)
+                 │
+                 ▼
+Outbox processor (background, retried, idempotent)
+   ├──► MongoDB read model       (upsert, applied only if the version is newer)
+   └──► Kafka                    (integration events, when the service publishes them)
+```
+
+- A command never writes to MongoDB directly, so SQL Server and MongoDB can never disagree permanently: a failed projection is retried from the outbox.
+- Read models are **eventually consistent**. A command response is built from the write model, so the caller always sees its own change immediately.
+- Projections are idempotent and version-checked, so replaying the outbox is always safe.
+- A read model can be rebuilt from SQL Server at any time.
+- Redis caches sit in front of the MongoDB read models only; money is never cached (Section 9).
+
 Use MediatR or an equivalent mediator implementation where appropriate.
 
 Use pipeline behaviors for cross-cutting concerns such as:
@@ -390,16 +433,15 @@ where appropriate.
 
 # 7. SQL Server
 
-Only services that genuinely require relational/transactional persistence should use SQL Server.
+SQL Server is the write store and source of truth for every service that accepts writes (Section 5.1):
 
-Potential consumers:
-
+- Authentication Service
 - Customer Service
 - Payment Service
 - Transaction Service
-- Authentication Service
+- Notification Service
 
-The exact assignment should be based on the service's business requirements.
+It is also the read store for all payment, amount and balance data.
 
 Use:
 
@@ -419,16 +461,17 @@ Financially important state changes must use proper transactional boundaries.
 
 # 8. MongoDB
 
-MongoDB is a common platform capability and may be used by multiple services for document-oriented workloads.
+MongoDB is the read store of every service (Section 5.1). Queries are served from MongoDB read models that are projected from SQL Server through the outbox; commands never write to MongoDB directly.
 
-Potential use cases:
+MongoDB never serves payment, amount or balance data for decisions or financial queries — those are read from SQL Server.
 
+Use cases:
+
+- Read models for queries
 - Audit records
-- Notification history
-- Flexible payment metadata
+- Notification history views
+- Non-financial payment metadata
 - Integration records
-- Read models
-- Event-related data
 
 MongoDB usage must have a clear reason; it should not be introduced simply to demonstrate NoSQL.
 
@@ -463,7 +506,7 @@ Use Redis for:
 - Idempotency records where appropriate
 - Short-lived distributed state
 
-Redis MUST NOT become the source of truth for financial transactions.
+Redis MUST NOT become the source of truth for financial transactions, and monetary values (payments, amounts, balances) are never served from the cache — they are always read from SQL Server (Section 5.1).
 
 Use:
 

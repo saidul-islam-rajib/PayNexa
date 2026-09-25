@@ -1,2 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Notifications.Domain</RootNamespace>
+  </PropertyGroup>
 </Project>
