@@ -1,7 +1,7 @@
 # Transaction Service
 
 **Status:** Planned — not implemented yet
-**Service name:** `transaction-service` · **Container:** `transaction.api` · **Ports:** HTTPS `6004`, HTTP `5004`
+**Service name:** `transaction-service` · **Compose service:** `transaction.api` · **Container:** `service-transaction-api` · **Ports:** HTTPS `6004`, HTTP `5004`
 
 Maintains the financial transaction ledger derived from payment outcomes.
 

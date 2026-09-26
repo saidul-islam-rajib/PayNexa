@@ -1,7 +1,7 @@
 # Authentication Service
 
 **Status:** Planned — not implemented yet
-**Service name:** `authentication-service` · **Container:** `authentication.api` · **Ports:** HTTPS `6002`, HTTP `5002`
+**Service name:** `authentication-service` · **Compose service:** `authentication.api` · **Container:** `service-authentication-api` · **Ports:** HTTPS `6002`, HTTP `5002`
 
 Issues and manages identities and tokens for the platform (requirements §12).
 

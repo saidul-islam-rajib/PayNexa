@@ -1,7 +1,7 @@
 # API Gateway
 
 **Status:** Routing implemented (YARP); authentication and rate limiting planned
-**Service name:** `api-gateway` · **Container:** `paynexa.apigateway` · **Ports:** HTTPS `6000`, HTTP `5000`
+**Service name:** `api-gateway` · **Compose service:** `paynexa.apigateway` · **Container:** `service-apigateway` · **Ports:** HTTPS `6000`, HTTP `5000`
 
 Single entry point for clients, built on YARP (requirements §11). It contains no business logic.
 

@@ -1,7 +1,7 @@
 # Customer Service
 
 **Status:** Implemented (v1)
-**Service name:** `customer-service` · **Container:** `customer.api` · **Ports:** HTTPS `6001`, HTTP `5001` (local and Docker)
+**Service name:** `customer-service` · **Compose service:** `customer.api` · **Container:** `service-customer-api` · **Ports:** HTTPS `6001`, HTTP `5001` (local and Docker)
 **Swagger (Development):** https://localhost:6001/swagger — opens automatically on F5 / `dotnet run`
 
 Owns the customer (the person who pays): registration, identity verification (KYC), residential address, contact details, account lifecycle and payment eligibility. Payment Service asks this service whether a customer may pay.
@@ -218,7 +218,7 @@ Shared keys: [BuildingBlocks.md](BuildingBlocks.md#13-configuration-reference).
 ## 8. Running and testing
 
 - **Visual Studio:** start `docker-compose` (Swagger opens at https://localhost:6001/swagger), or start `Customer.API` with the `https` profile while the infrastructure containers run.
-- **Command line:** `cd src` → `docker compose up -d --build`.
+- **Command line:** `docker compose up -d --build` from the repository root; rebuild only this service with `docker compose up -d --build customer.api`.
 - **Sample requests:** `src/Services/Customer/Customer.API/Customer.API.http`.
 - **Unit tests** (`tests/Unit/Customer.UnitTests`, 69 tests): value objects, aggregate lifecycle (status transitions, KYC, minimum age, eligibility), validators (including query-parameter error keys), register handler, shared command handler (not found, concurrency, domain rules, email uniqueness), integration-event mapping, Mapperly mappers, queries (cache, email lookup, eligibility from the write store, filters).
 

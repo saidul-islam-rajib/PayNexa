@@ -17,7 +17,7 @@ x-service-volumes: &service-volumes
 
 services:
   sqlserver:
-    container_name: sqlserver
+    container_name: database-sqlserver
     restart: always
     environment:
       ACCEPT_EULA: "Y"
@@ -28,7 +28,7 @@ services:
       - sqlserver_data:/var/opt/mssql
 
   mongodb:
-    container_name: mongodb
+    container_name: database-mongodb
     restart: always
     ports:
       - "27017:27017"
@@ -36,7 +36,7 @@ services:
       - mongo_data:/data/db
 
   redis:
-    container_name: redis
+    container_name: database-redis
     restart: always
     ports:
       - "6379:6379"
@@ -44,7 +44,7 @@ services:
       - redis_data:/data
 
   kafka:
-    container_name: kafka
+    container_name: infrastructure-kafka
     restart: always
     environment:
       KAFKA_NODE_ID: 1
@@ -67,7 +67,7 @@ services:
       - kafka_data:/var/lib/kafka/data
 
   kafka-ui:
-    container_name: kafka-ui
+    container_name: infrastructure-kafka-ui
     restart: always
     environment:
       KAFKA_CLUSTERS_0_NAME: paynexa
@@ -77,7 +77,7 @@ services:
       - "8090:8080"
 
   seq:
-    container_name: seq
+    container_name: infrastructure-seq
     restart: always
     environment:
       ACCEPT_EULA: "Y"
@@ -89,7 +89,7 @@ services:
       - seq_data:/data
 
   paynexa.apigateway:
-    container_name: paynexa.apigateway
+    container_name: service-apigateway
     environment:
       <<: *service-environment
       ReverseProxy__Clusters__authentication__Destinations__primary__Address: http://authentication.api:8080
@@ -103,7 +103,7 @@ services:
     volumes: *service-volumes
 
   customer.api:
-    container_name: customer.api
+    container_name: service-customer-api
     environment:
       <<: *service-environment
       MongoDb__DatabaseName: paynexa_customer
@@ -115,7 +115,7 @@ services:
     volumes: *service-volumes
 
   authentication.api:
-    container_name: authentication.api
+    container_name: service-authentication-api
     environment:
       <<: *service-environment
       MongoDb__DatabaseName: paynexa_auth
@@ -127,7 +127,7 @@ services:
     volumes: *service-volumes
 
   payment.api:
-    container_name: payment.api
+    container_name: service-payment-api
     environment:
       <<: *service-environment
       MongoDb__DatabaseName: paynexa_payment
@@ -139,7 +139,7 @@ services:
     volumes: *service-volumes
 
   transaction.api:
-    container_name: transaction.api
+    container_name: service-transaction-api
     environment:
       <<: *service-environment
       MongoDb__DatabaseName: paynexa_transaction
@@ -151,7 +151,7 @@ services:
     volumes: *service-volumes
 
   notification.api:
-    container_name: notification.api
+    container_name: service-notification-api
     environment:
       <<: *service-environment
       MongoDb__DatabaseName: paynexa_notification

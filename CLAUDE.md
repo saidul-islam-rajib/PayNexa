@@ -30,7 +30,7 @@
 - In Development, startup creates/migrates databases, collections, indexes and Kafka topics, and seeds data when the store is empty.
 
 ## Docker
-- The Compose project is always named `paynexa`; containers use fixed `container_name`s.
+- One Compose project, `paynexa` (root `compose.yaml` includes `src/docker-compose.yml` + override). Container names are prefixed by category: `database-*` (SQL Server, MongoDB, Redis), `infrastructure-*` (Kafka, Kafka UI, Seq), `service-*` (gateway and APIs, e.g. `service-customer-api`). Services address each other by compose service name, never by container name.
 - Every change to a microservice includes its Docker updates (Dockerfile, `docker-compose.yml`, `docker-compose.override.yml`, `.env.example`), and the containers are rebuilt and running on the latest code.
 
 ## Documentation

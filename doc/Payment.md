@@ -1,7 +1,7 @@
 # Payment Service
 
 **Status:** Planned — not implemented yet
-**Service name:** `payment-service` · **Container:** `payment.api` · **Ports:** HTTPS `6003`, HTTP `5003`
+**Service name:** `payment-service` · **Compose service:** `payment.api` · **Container:** `service-payment-api` · **Ports:** HTTPS `6003`, HTTP `5003`
 
 Accepts, validates and processes payments. It is the platform's primary demonstration flow (requirements §40).
 

@@ -1,7 +1,7 @@
 # Notification Service
 
 **Status:** Planned — not implemented yet
-**Service name:** `notification-service` · **Container:** `notification.api` · **Ports:** HTTPS `6005`, HTTP `5005`
+**Service name:** `notification-service` · **Compose service:** `notification.api` · **Container:** `service-notification-api` · **Ports:** HTTPS `6005`, HTTP `5005`
 
 Sends email/SMS notifications in reaction to platform events. It has no public gateway route — it is reachable only through Kafka (requirements §3.2).
 

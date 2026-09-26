@@ -62,9 +62,17 @@ The same ports apply to `dotnet run` / F5 and to Docker. Swagger opens automatic
 ### Run
 
 - **Visual Studio:** open `src/PayNexa.slnx`, set `docker-compose` as the startup project, press F5 — Customer Swagger opens.
-- **Command line (from the repository root):** `docker compose up -d --build` builds every image and starts the whole stack. The root `compose.yaml` includes `src/docker-compose.yml` + `src/docker-compose.override.yml` and reads `src/.env`. Stop with `docker compose down`.
+- **Command line (from the repository root):** `docker compose up -d --build` builds every image and starts everything; `docker compose down` stops it (data is kept). Rebuild one service with `docker compose up -d --build customer.api`. The root `compose.yaml` includes `src/docker-compose.yml` + `src/docker-compose.override.yml` and reads `src/.env`.
 
-The stack runs as the Docker Compose project `paynexa` (`name:` in `docker-compose.yml`, `DockerComposeProjectName` in `docker-compose.dcproj`), so Visual Studio and the command line share the same containers and the `paynexa_*` volumes.
+Everything runs as one Docker Compose project, `paynexa`; container names start with their category so they are grouped in Docker Desktop:
+
+| Prefix | Containers |
+|---|---|
+| `database-` | `database-sqlserver`, `database-mongodb`, `database-redis` |
+| `infrastructure-` | `infrastructure-kafka`, `infrastructure-kafka-ui`, `infrastructure-seq` |
+| `service-` | `service-apigateway`, `service-customer-api`, `service-authentication-api`, `service-payment-api`, `service-transaction-api`, `service-notification-api` |
+
+Compose commands use the service names (`sqlserver`, `customer.api`, …); `docker exec` / `docker logs` use the container names (`database-sqlserver`, `service-customer-api`, …). Containers reach each other by service name.
 
 In Development every service creates its databases, collections, indexes and Kafka topics on startup, and seeds data when its store is empty.
 
