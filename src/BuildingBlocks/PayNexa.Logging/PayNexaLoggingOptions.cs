@@ -1,3 +1,5 @@
+using PayNexa.Logging.RequestLogging;
+
 namespace PayNexa.Logging;
 
 public sealed class PayNexaLoggingOptions
@@ -13,6 +15,8 @@ public sealed class PayNexaLoggingOptions
     public string? FileDirectory { get; set; }
 
     public int RetainedFileCount { get; set; } = 7;
+
+    public HttpBodyLoggingOptions HttpBodies { get; set; } = new();
 }
 
 public enum ConsoleLogFormat

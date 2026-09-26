@@ -16,6 +16,9 @@ public static class PiiMasker
         return $"{email[0]}***{email[at..]}";
     }
 
+    public static string MaskPersonal(string value) =>
+        value.Length <= 1 ? SensitiveDataMaskingEnricher.Redacted : $"{value[0]}***";
+
     public static string MaskPhone(string phone)
     {
         var digits = phone.Where(char.IsAsciiDigit).ToArray();

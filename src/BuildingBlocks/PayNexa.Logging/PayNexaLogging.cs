@@ -32,6 +32,7 @@ public static class PayNexaLogging
                       ?? new PayNexaLoggingOptions();
 
         services.AddSingleton(identity);
+        services.AddSingleton(options.HttpBodies);
         services.AddSerilog((provider, loggerConfiguration) =>
             Configure(loggerConfiguration, configuration, provider, identity, options));
 
@@ -43,6 +44,12 @@ public static class PayNexaLogging
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseMiddleware<RequestStartedLoggingMiddleware>();
+
+        if (IsHttpBodyLoggingEnabled(app.ApplicationServices))
+        {
+            app.UseMiddleware<HttpBodyLoggingMiddleware>();
+        }
+
         app.UseSerilogRequestLogging(options =>
         {
             options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.00} ms";
@@ -52,6 +59,10 @@ public static class PayNexaLogging
 
         return app;
     }
+
+    private static bool IsHttpBodyLoggingEnabled(IServiceProvider services) =>
+        services.GetRequiredService<IHostEnvironment>().IsDevelopment()
+        && services.GetRequiredService<HttpBodyLoggingOptions>().Enabled;
 
     private static void Configure(
         LoggerConfiguration configuration,

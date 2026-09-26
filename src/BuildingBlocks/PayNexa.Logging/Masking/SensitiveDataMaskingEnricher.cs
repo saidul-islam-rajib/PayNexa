@@ -7,12 +7,6 @@ public sealed class SensitiveDataMaskingEnricher : ILogEventEnricher
 {
     public const string Redacted = "***REDACTED***";
 
-    private static readonly string[] SecretNameFragments =
-    [
-        "password", "secret", "token", "apikey", "api_key", "authorization", "credential",
-        "cardnumber", "card_number", "cvv", "cvc", "primaryaccountnumber", "connectionstring", "privatekey",
-    ];
-
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
     {
         foreach (var (name, value) in logEvent.Properties.ToArray())
@@ -28,15 +22,16 @@ public sealed class SensitiveDataMaskingEnricher : ILogEventEnricher
 
     internal static LogEventPropertyValue Mask(string name, LogEventPropertyValue value)
     {
-        if (IsSecret(name))
+        var kind = SensitiveFields.Classify(name);
+
+        if (kind == SensitiveFieldKind.Secret)
         {
             return new ScalarValue(Redacted);
         }
 
         return value switch
         {
-            ScalarValue { Value: string text } when IsEmail(name) => new ScalarValue(PiiMasker.MaskEmail(text)),
-            ScalarValue { Value: string text } when IsPhone(name) => new ScalarValue(PiiMasker.MaskPhone(text)),
+            ScalarValue { Value: string text } when kind != SensitiveFieldKind.None => new ScalarValue(SensitiveFields.Mask(kind, text)),
             StructureValue structure => MaskStructure(structure),
             SequenceValue sequence => MaskSequence(name, sequence),
             DictionaryValue dictionary => MaskDictionary(dictionary),
@@ -82,11 +77,4 @@ public sealed class SensitiveDataMaskingEnricher : ILogEventEnricher
         return changed ? new DictionaryValue(entries) : dictionary;
     }
 
-    private static bool IsSecret(string name) =>
-        SecretNameFragments.Any(fragment => name.Contains(fragment, StringComparison.OrdinalIgnoreCase))
-        && !name.EndsWith("ExpiresAtUtc", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsEmail(string name) => name.Contains("email", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsPhone(string name) => name.Contains("phone", StringComparison.OrdinalIgnoreCase);
 }

@@ -312,6 +312,7 @@ Startup code never references EF Core, MongoDB or Kafka directly; adding a new s
 | Service-to-service HTTP | `payment-service -> customer-service GetCustomer started / succeeded / failed / ended`, attempts |
 | Resilience | retries, circuit OPENED / HALF-OPEN / CLOSED |
 | Startup | `Initialize CustomerDbContext migrations`, `Initialize Kafka topics`, `Seed Customers` |
+| HTTP bodies (Development only) | `HTTP PUT /api/v1/customers/{id}/email request body: {"email":"r***@example.com"}` · `… response body (200): {…}` — see 7.7 |
 
 ### 7.4 Steps inside a handler
 
@@ -349,8 +350,30 @@ using (var step = logger.BeginStep("Email uniqueness check"))
 
 ### 7.6 Sensitive data and correlation
 
-- Properties named like `password`, `secret`, `token`, `apikey`, `authorization`, `credential`, `cardnumber`, `cvv`, `connectionstring`, `privatekey` are redacted; `*Email*` and `*Phone*` are partially masked — including nested objects.
+One rule set (`SensitiveFields`) masks both structured log properties and JSON bodies, including nested objects and arrays:
+
+| Field name contains | Result |
+|---|---|
+| `password`, `secret`, `token`, `apikey`, `authorization`, `credential`, `cardnumber`, `cvv`, `cvc`, `connectionstring`, `privatekey` | `***REDACTED***` (the whole value, even an object or number) |
+| `email` | `r***@example.com` |
+| `phone` | `*********1234` |
+| `firstName`, `lastName`, `fullName`, `dateOfBirth`, `line1`, `line2`, `postalCode` | first character + `***` |
+
 - `X-Correlation-Id` is accepted (validated) or generated, echoed in the response, added to every log event, tagged on traces, stored with outbox messages, sent as a Kafka header and forwarded on outbound HTTP calls.
+
+### 7.7 Request and response bodies (Development only)
+
+`HttpBodyLoggingMiddleware` logs the JSON request body and the response body with its status code (event ids 2001 / 2002), after masking. It runs only when **both** hold:
+
+- the environment is `Development`, and
+- `PayNexaLogging:HttpBodies:Enabled` is `true` (set in every `appsettings.Development.json`; `false` in `appsettings.json` and forced `false` in Docker through `PayNexaLogging__HttpBodies__Enabled`).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `HttpBodies:MaxLoggedLength` | 4096 | Masked body longer than this is truncated (`… (truncated, N chars)`) |
+| `HttpBodies:MaxCapturedBytes` | 1048576 | Bodies above this are not read: `(not logged: N bytes exceeds the capture limit)` |
+
+Health, OpenAPI and Swagger endpoints are skipped; non-JSON bodies are described (`(not logged: text/plain, 7 bytes)`) instead of logged. Problem Details responses are logged too, because the middleware runs before the exception handler. In Seq: `EventId.Id in [2001, 2002]`, or `RequestBody like '%…%'`.
 
 ---
 
@@ -447,6 +470,7 @@ Pipeline: `ServiceCallLoggingHandler` → standard resilience (timeouts, retry w
 | `<Service>:*` | per service | Service-specific settings, e.g. `Customer:MinimumAgeYears`, `Customer:ProfileCacheTimeToLive`, `Jwt:*`, `Payment:*` — bound to validated options classes |
 | `ReverseProxy:Routes` / `Clusters` | gateway | YARP routes (`/api/v1/{auth,customers,payments,transactions}/**`) and service addresses (localhost ports in Development, container names in Docker) |
 | `PayNexaLogging:SeqServerUrl` / `ConsoleFormat` / `FileDirectory` | — / Text / temp | |
+| `PayNexaLogging:HttpBodies:Enabled` / `MaxLoggedLength` / `MaxCapturedBytes` | false (true in Development settings) / 4096 / 1048576 | Request/response body logging, Development only (7.7) |
 | `Observability:OtlpTracesEndpoint` / `OtlpMetricsEndpoint` | — | Seq accepts traces at `/ingest/otlp/v1/traces` |
 
 ---
