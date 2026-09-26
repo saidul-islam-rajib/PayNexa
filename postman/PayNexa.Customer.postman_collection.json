@@ -1,0 +1,934 @@
+{
+  "info": {
+    "name": "PayNexa - Customer API",
+    "description": "Every Customer API endpoint for the local environment. Select the **PayNexa - Local** environment first.\n\nRun the folders top to bottom (or use the Collection Runner): **Register customer** stores the new `customerId` and `customerEmail` in the environment, and every later request uses them.\n\nEach request sends `X-Correlation-Id: {{correlationId}}` (a new value per request), so you can paste it into Seq (`CorrelationId = '...'`) to see the full server-side log trail.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.environment.set(\"correlationId\", \"postman-\" + Date.now() + \"-\" + Math.floor(Math.random() * 100000));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "console.log(pm.info.requestName + \" -> \" + pm.response.code + \" | CorrelationId = \" + pm.environment.get(\"correlationId\"));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Registration",
+      "item": [
+        {
+          "name": "Register customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers"
+              ]
+            },
+            "description": "Registers a customer (address optional). Generates a unique email and phone so it can run repeatedly. Saves `customerId` and `customerEmail` to the environment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"{{firstName}}\",\n  \"lastName\": \"{{lastName}}\",\n  \"email\": \"{{uniqueEmail}}\",\n  \"phoneNumber\": \"{{uniquePhone}}\",\n  \"dateOfBirth\": \"{{dateOfBirth}}\",\n  \"address\": {\n    \"line1\": \"{{addressLine1}}\",\n    \"line2\": null,\n    \"city\": \"{{addressCity}}\",\n    \"state\": null,\n    \"postalCode\": \"{{addressPostalCode}}\",\n    \"countryCode\": \"{{addressCountryCode}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"uniqueEmail\", \"nadia.\" + Date.now() + \"@example.com\");",
+                  "pm.environment.set(\"uniquePhone\", \"+8801711\" + String(Math.floor(100000 + Math.random() * 900000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));",
+                  "pm.test(\"Location header is returned\", () => pm.response.to.have.header(\"Location\"));",
+                  "const body = pm.response.json();",
+                  "if (body && body.id) {",
+                  "    pm.environment.set(\"customerId\", body.id);",
+                  "    pm.environment.set(\"customerEmail\", body.email);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Queries",
+      "item": [
+        {
+          "name": "List customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers?page={{page}}&page-size={{pageSize}}&sort-by=created-at&sort-order=desc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "page-size",
+                  "value": "{{pageSize}}"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "Active",
+                  "disabled": true
+                },
+                {
+                  "key": "kyc-status",
+                  "value": "Pending",
+                  "disabled": true
+                },
+                {
+                  "key": "sort-by",
+                  "value": "created-at"
+                },
+                {
+                  "key": "sort-order",
+                  "value": "desc"
+                }
+              ]
+            },
+            "description": "Paged list from the MongoDB read model. Enable `search`, `status` (Active | Suspended | Closed) or `kyc-status` (Pending | Verified | Rejected) to filter. `sort-by`: created-at | updated-at | first-name | last-name | email."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));",
+                  "pm.test(\"Paged result\", () => pm.expect(pm.response.json()).to.have.property(\"items\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get customer by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "Reads one customer (Redis cache, then MongoDB read model). Right after registration the read model may need a second to catch up (outbox); retry if you get 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lookup customer by email",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/lookup?email={{customerEmail}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "{{customerEmail}}"
+                }
+              ]
+            },
+            "description": "Finds a customer by email in the read model."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get payment eligibility",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/payment-eligibility",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "payment-eligibility"
+              ]
+            },
+            "description": "Can this customer pay? Read from SQL Server (source of truth). Eligible only when status is Active and KYC is Verified; otherwise `reasons` explains why."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));",
+                  "pm.test(\"Has isEligible\", () => pm.expect(pm.response.json()).to.have.property(\"isEligible\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Profile",
+      "item": [
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "Updates first name, last name and phone number (E.164).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"{{firstName}}\",\n  \"lastName\": \"{{lastName}}\",\n  \"phoneNumber\": \"{{updatedPhoneNumber}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change email",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "email"
+              ]
+            },
+            "description": "Changes the email address (must be unique). Updates `customerEmail` in the environment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{newEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"newEmail\", \"nadia.updated.\" + Date.now() + \"@example.com\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));",
+                  "const body = pm.response.json();",
+                  "if (body && body.id) {",
+                  "    pm.environment.set(\"customerId\", body.id);",
+                  "    pm.environment.set(\"customerEmail\", body.email);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/address",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "address"
+              ]
+            },
+            "description": "Replaces the residential address. `countryCode` is ISO 3166-1 alpha-2.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": {\n    \"line1\": \"Banani Road 11\",\n    \"line2\": \"Flat 4B\",\n    \"city\": \"{{addressCity}}\",\n    \"state\": \"Dhaka\",\n    \"postalCode\": \"1213\",\n    \"countryCode\": \"{{addressCountryCode}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. KYC",
+      "item": [
+        {
+          "name": "Reject KYC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/kyc/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "kyc",
+                "reject"
+              ]
+            },
+            "description": "Rejects identity verification. Allowed only while KYC is Pending (a freshly registered customer).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"{{kycRejectionReason}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify KYC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/kyc/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "kyc",
+                "verify"
+              ]
+            },
+            "description": "Marks identity as verified (from Pending or Rejected). Requires an address on file."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Status",
+      "item": [
+        {
+          "name": "Suspend customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "suspend"
+              ]
+            },
+            "description": "Suspends an active customer (reason required). A suspended customer is not payment-eligible.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"{{suspensionReason}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reactivate customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/reactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "reactivate"
+              ]
+            },
+            "description": "Reactivates a suspended customer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Close customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/{{apiVersion}}/customers/{{customerId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}",
+                "close"
+              ]
+            },
+            "description": "Closes the customer permanently (terminal state; no further changes allowed). Run last.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"{{closureReason}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Health",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "live"
+              ]
+            },
+            "description": "Process is up."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "description": "SQL Server, MongoDB, Redis and Kafka checks."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Through the API Gateway",
+      "item": [
+        {
+          "name": "List customers via gateway",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/api/{{apiVersion}}/customers?page={{page}}&page-size={{pageSize}}",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "page-size",
+                  "value": "{{pageSize}}"
+                }
+              ]
+            },
+            "description": "Same list routed through YARP; the gateway forwards `X-Correlation-Id`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get customer by id via gateway",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gatewayUrl}}/api/{{apiVersion}}/customers/{{customerId}}",
+              "host": [
+                "{{gatewayUrl}}"
+              ],
+              "path": [
+                "api",
+                "{{apiVersion}}",
+                "customers",
+                "{{customerId}}"
+              ]
+            },
+            "description": "Single customer through the gateway."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correlation id is echoed\", () => pm.expect(pm.response.headers.get(\"X-Correlation-Id\")).to.eql(pm.environment.get(\"correlationId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
