@@ -3,10 +3,12 @@ using Asp.Versioning;
 using Asp.Versioning.Conventions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PayNexa.AspNetCore.Conventions;
+using PayNexa.AspNetCore.OpenApi;
 using PayNexa.AspNetCore.ProblemDetails;
 using PayNexa.AspNetCore.Security;
 using PayNexa.Common.Behaviors;
@@ -62,6 +64,8 @@ public static class ServiceDefaults
                 options.SubstituteApiVersionInUrl = true;
             })
             .AddOpenApi();
+
+        services.ConfigureAll<OpenApiOptions>(options => options.AddDocumentTransformer<OptionalObjectPropertyDocumentTransformer>());
 
         return services;
     }

@@ -162,6 +162,7 @@ public sealed partial class CustomersController
 | API version | Namespace `Controllers.V1` (`VersionByNamespaceConvention`) |
 | URL casing | `KebabCaseParameterTransformer` (`PaymentEligibility` → `payment-eligibility`) and lowercase URLs |
 | Response types in OpenAPI | `ProblemDetailsResponseConvention`: success type from `ActionResult<T>`; 201 for create, 200/204 otherwise; 400 validation; 404 when the route targets a resource; 409/422 for commands; 500 always |
+| Optional object properties in OpenAPI | `OptionalObjectPropertyDocumentTransformer`: a nullable object property (`AddressDto? Address`) is published as an optional `$ref` instead of `oneOf: [null, $ref]`, so Swagger UI generates a real object example instead of `"string"` |
 | Sending | `QueryAsync` (`IQuery<Result<T>>`), `CommandAsync` (`ICommand<Result<T>>`), `CreateAsync` (201 + `Location` built from the id and current version); `ISender` is resolved by the base, so controllers have no constructor |
 | Result → HTTP | `Respond` / `RespondCreated` (`Result` failures become Problem Details) |
 
