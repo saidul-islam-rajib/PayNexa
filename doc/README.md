@@ -76,6 +76,29 @@ Compose commands use the service names (`sqlserver`, `customer.api`, …); `dock
 
 In Development every service creates its databases, collections, indexes and Kafka topics on startup, and seeds data when its store is empty.
 
+### Run APIs locally with local SQL Server and MongoDB
+
+The APIs run from Visual Studio or `dotnet run`, SQL Server and MongoDB are installed on the machine, and Redis, Kafka, Kafka UI and Seq stay in Docker.
+
+1. Free the ports and start only the shared infrastructure:
+
+   ```powershell
+   docker compose stop sqlserver mongodb paynexa.apigateway customer.api authentication.api payment.api transaction.api notification.api
+   docker compose up -d redis kafka kafka-ui seq
+   ```
+
+2. Point each API at the local SQL Server with Windows Authentication (machine-specific, so it lives in user-secrets, never in `appsettings`). Example for LocalDB:
+
+   ```powershell
+   dotnet user-secrets set "ConnectionStrings:CustomerDb" "Server=(localdb)\MSSQLLocalDB;Database=CustomerDb;Trusted_Connection=True;TrustServerCertificate=True" --project src\Services\Customer\Customer.API
+   dotnet user-secrets remove "SqlServer:Password" --project src\Services\Customer\Customer.API
+   ```
+
+   Connection string names: `AuthDb`, `CustomerDb`, `PaymentDb`, `TransactionDb`, `NotificationDb`. `SqlServer:Password` is only merged in when set, so Windows Authentication needs it removed.
+
+3. Run a local MongoDB on `localhost:27017` (default install, no settings needed).
+4. Start the APIs with the `https` launch profile (`dotnet run --project src\Services\Customer\Customer.API --launch-profile https`, or multiple startup projects in Visual Studio). Databases are created, migrated and seeded on first start.
+
 ### Test
 
 ```powershell
