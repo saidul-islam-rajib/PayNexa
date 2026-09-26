@@ -220,6 +220,7 @@ Shared keys: [BuildingBlocks.md](BuildingBlocks.md#13-configuration-reference).
 - **Visual Studio:** start `docker-compose` (Swagger opens at https://localhost:6001/swagger), or start `Customer.API` with the `https` profile while the infrastructure containers run.
 - **Command line:** `docker compose up -d --build` from the repository root; rebuild only this service with `docker compose up -d --build customer.api`.
 - **Sample requests:** `src/Services/Customer/Customer.API/Customer.API.http`.
+- **Postman:** import `postman/PayNexa.Customer.postman_collection.json` and `postman/PayNexa.Local.postman_environment.json`, select the **PayNexa - Local** environment and run the folders in order (Register stores `customerId` / `customerEmail`; every request sends a fresh `X-Correlation-Id` to search in Seq). Newman: `npx newman run postman/PayNexa.Customer.postman_collection.json -e postman/PayNexa.Local.postman_environment.json --insecure`.
 - **Unit tests** (`tests/Unit/Customer.UnitTests`, 69 tests): value objects, aggregate lifecycle (status transitions, KYC, minimum age, eligibility), validators (including query-parameter error keys), register handler, shared command handler (not found, concurrency, domain rules, email uniqueness), integration-event mapping, Mapperly mappers, queries (cache, email lookup, eligibility from the write store, filters).
 
 ```powershell

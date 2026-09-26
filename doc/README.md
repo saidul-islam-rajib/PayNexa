@@ -4,6 +4,7 @@
 |---|---|
 | [fintech_microservices_industry_requirements.md](fintech_microservices_industry_requirements.md) | The platform requirements |
 | [BuildingBlocks.md](BuildingBlocks.md) | Shared foundation: DDD base types, events and Kafka, pagination, startup initialization, logging, errors, stores, service clients, ports, configuration |
+| [Logging.md](Logging.md) | Logging and observability end to end: Serilog, Seq, console, correlation, masking, diagrams and real traces |
 | [ApiGateway.md](ApiGateway.md) | YARP gateway |
 | [Authentication.md](Authentication.md) | Authentication Service |
 | [Customer.md](Customer.md) | Customer Service |
