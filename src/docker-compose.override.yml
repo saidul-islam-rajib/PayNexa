@@ -1,18 +1,35 @@
-# Local development only. Secrets come from src/.env (gitignored) until Vault is wired in (requirements §13).
+x-service-environment: &service-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ASPNETCORE_HTTP_PORTS: "8080"
+  ASPNETCORE_HTTPS_PORTS: "8081"
+  ASPNETCORE_Kestrel__Certificates__Default__Path: /https/paynexa-dev.pfx
+  ASPNETCORE_Kestrel__Certificates__Default__Password: ${DEV_CERT_PASSWORD}
+  PayNexaLogging__SeqServerUrl: http://seq:5341
+  PayNexaLogging__ConsoleFormat: Text
+  PayNexaLogging__HttpBodies__Enabled: "false"
+  Observability__OtlpTracesEndpoint: http://seq:5341/ingest/otlp/v1/traces
+  MongoDb__ConnectionString: mongodb://mongodb:27017
+  Redis__ConnectionString: redis:6379
+  Kafka__BootstrapServers: kafka:29092
+  SqlServer__Password: ${SQL_SA_PASSWORD}
+
+x-service-volumes: &service-volumes
+  - ${APPDATA}/ASP.NET/Https:/https:ro
+
 services:
   sqlserver:
-    container_name: sqlserver
+    container_name: database-sqlserver
     restart: always
     environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=${SQL_SA_PASSWORD}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD}
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
 
   mongodb:
-    container_name: mongodb
+    container_name: database-mongodb
     restart: always
     ports:
       - "27017:27017"
@@ -20,117 +37,128 @@ services:
       - mongo_data:/data/db
 
   redis:
-    container_name: redis
+    container_name: database-redis
     restart: always
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
 
-  paynexa.apigateway:
-    container_name: paynexa.apigateway
+  kafka:
+    container_name: infrastructure-kafka
+    restart: always
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
-      - "RedisSettings__ConnectionString=redis:6379"
-      - "RedisSettings__KeyPrefix=gateway:"
-    depends_on: [authentication.api, customer.api, payment.api, transaction.api, redis]
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: HOST://:9092,DOCKER://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,DOCKER://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     ports:
-      - "8000:8080"
-      - "8081"
+      - "9092:9092"
     volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - kafka_data:/var/lib/kafka/data
 
-  authentication.api:
-    container_name: authentication.api
+  kafka-ui:
+    container_name: infrastructure-kafka-ui
+    restart: always
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
-      - "MongoDbSettings__ConnectionString=mongodb://mongodb:27017"
-      - "MongoDbSettings__DatabaseName=paynexa_auth"
-      - "RedisSettings__ConnectionString=redis:6379"
-      - "RedisSettings__KeyPrefix=auth:"
-    depends_on: [mongodb, redis]
+      KAFKA_CLUSTERS_0_NAME: paynexa
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on: [kafka]
     ports:
-      - "8001:8080"
-      - "8081"
+      - "8090:8080"
+
+  seq:
+    container_name: infrastructure-seq
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_ADMIN_PASSWORD}
+    ports:
+      - "5341:5341"
+      - "5342:80"
     volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - seq_data:/data
+
+  paynexa.apigateway:
+    container_name: service-apigateway
+    environment:
+      <<: *service-environment
+      ReverseProxy__Clusters__authentication__Destinations__primary__Address: http://authentication.api:8080
+      ReverseProxy__Clusters__customer__Destinations__primary__Address: http://customer.api:8080
+      ReverseProxy__Clusters__payment__Destinations__primary__Address: http://payment.api:8080
+      ReverseProxy__Clusters__transaction__Destinations__primary__Address: http://transaction.api:8080
+    depends_on: [seq, customer.api, authentication.api, payment.api, transaction.api]
+    ports:
+      - "5000:8080"
+      - "6000:8081"
+    volumes: *service-volumes
 
   customer.api:
-    container_name: customer.api
+    container_name: service-customer-api
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
-      - "MongoDbSettings__ConnectionString=mongodb://mongodb:27017"
-      - "MongoDbSettings__DatabaseName=paynexa_customer"
-      - "RedisSettings__ConnectionString=redis:6379"
-      - "RedisSettings__KeyPrefix=customer:"
-    depends_on: [mongodb, redis]
+      <<: *service-environment
+      MongoDb__DatabaseName: paynexa_customer
+      ConnectionStrings__CustomerDb: Server=sqlserver;Database=CustomerDb;User Id=sa;TrustServerCertificate=True;Encrypt=False
+    depends_on: [seq, sqlserver, mongodb, redis, kafka]
     ports:
-      - "8002:8080"
-      - "8081"
-    volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - "5001:8080"
+      - "6001:8081"
+    volumes: *service-volumes
+
+  authentication.api:
+    container_name: service-authentication-api
+    environment:
+      <<: *service-environment
+      MongoDb__DatabaseName: paynexa_auth
+      ConnectionStrings__AuthDb: Server=sqlserver;Database=AuthDb;User Id=sa;TrustServerCertificate=True;Encrypt=False
+    depends_on: [seq, sqlserver, mongodb, redis, kafka]
+    ports:
+      - "5002:8080"
+      - "6002:8081"
+    volumes: *service-volumes
 
   payment.api:
-    container_name: payment.api
+    container_name: service-payment-api
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
-      - "ConnectionStrings__PaymentDb=Server=sqlserver;Database=PaymentDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=True"
-      - "MongoDbSettings__ConnectionString=mongodb://mongodb:27017"
-      - "MongoDbSettings__DatabaseName=paynexa_payment"
-      - "RedisSettings__ConnectionString=redis:6379"
-      - "RedisSettings__KeyPrefix=payment:"
-    depends_on: [sqlserver, mongodb, redis]
+      <<: *service-environment
+      MongoDb__DatabaseName: paynexa_payment
+      ConnectionStrings__PaymentDb: Server=sqlserver;Database=PaymentDb;User Id=sa;TrustServerCertificate=True;Encrypt=False
+    depends_on: [seq, sqlserver, mongodb, redis, kafka]
     ports:
-      - "8003:8080"
-      - "8081"
-    volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - "5003:8080"
+      - "6003:8081"
+    volumes: *service-volumes
 
   transaction.api:
-    container_name: transaction.api
+    container_name: service-transaction-api
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
-      - "ConnectionStrings__TransactionDb=Server=sqlserver;Database=TransactionDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=True"
-      - "MongoDbSettings__ConnectionString=mongodb://mongodb:27017"
-      - "MongoDbSettings__DatabaseName=paynexa_transaction"
-      - "RedisSettings__ConnectionString=redis:6379"
-      - "RedisSettings__KeyPrefix=transaction:"
-    depends_on: [sqlserver, mongodb, redis]
+      <<: *service-environment
+      MongoDb__DatabaseName: paynexa_transaction
+      ConnectionStrings__TransactionDb: Server=sqlserver;Database=TransactionDb;User Id=sa;TrustServerCertificate=True;Encrypt=False
+    depends_on: [seq, sqlserver, mongodb, redis, kafka]
     ports:
-      - "8004:8080"
-      - "8081"
-    volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - "5004:8080"
+      - "6004:8081"
+    volumes: *service-volumes
 
   notification.api:
-    container_name: notification.api
+    container_name: service-notification-api
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_HTTP_PORTS=8080
-      - ASPNETCORE_HTTPS_PORTS=8081
-      - "MongoDbSettings__ConnectionString=mongodb://mongodb:27017"
-      - "MongoDbSettings__DatabaseName=paynexa_notification"
-      - "RedisSettings__ConnectionString=redis:6379"
-      - "RedisSettings__KeyPrefix=notification:"
-    depends_on: [mongodb, redis]
+      <<: *service-environment
+      MongoDb__DatabaseName: paynexa_notification
+      ConnectionStrings__NotificationDb: Server=sqlserver;Database=NotificationDb;User Id=sa;TrustServerCertificate=True;Encrypt=False
+    depends_on: [seq, sqlserver, mongodb, redis, kafka]
     ports:
-      - "8005:8080"
-      - "8081"
-    volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+      - "5005:8080"
+      - "6005:8081"
+    volumes: *service-volumes

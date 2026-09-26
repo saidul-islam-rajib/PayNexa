@@ -1,2 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Customers.Contracts</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Messaging.Abstractions\PayNexa.Messaging.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

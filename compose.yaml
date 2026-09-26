@@ -1,0 +1,8 @@
+name: paynexa
+
+include:
+  - path:
+      - src/docker-compose.yml
+      - src/docker-compose.override.yml
+    project_directory: src
+    env_file: src/.env

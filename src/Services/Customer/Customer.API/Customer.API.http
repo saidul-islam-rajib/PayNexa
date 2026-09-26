@@ -1,13 +1,85 @@
-@Customer.API_HostAddress = http://localhost:5217
+@host = https://localhost:6001
+@customerId = 58c49479-ec65-4de2-86e7-033c546291aa
 
-GET {{Customer.API_HostAddress}}/health
+POST {{host}}/api/v1/customers
+Content-Type: application/json
+X-Correlation-Id: demo-register-001
+
+{
+  "firstName": "Nadia",
+  "lastName": "Rahman",
+  "email": "nadia@example.com",
+  "phoneNumber": "+8801711000000",
+  "dateOfBirth": "1992-03-10",
+  "address": { "line1": "Gulshan Ave", "line2": null, "city": "Dhaka", "state": null, "postalCode": "1212", "countryCode": "BD" }
+}
 
 ###
 
-GET {{Customer.API_HostAddress}}/health/live
+GET {{host}}/api/v1/customers?page=1&page-size=20&status=active&kyc-status=verified&sort-by=created-at&sort-order=desc
 
 ###
 
-GET {{Customer.API_HostAddress}}/health/ready
+GET {{host}}/api/v1/customers/{{customerId}}
 
 ###
+
+GET {{host}}/api/v1/customers/lookup?email=saidul.is.rajib@gmail.com
+
+###
+
+GET {{host}}/api/v1/customers/{{customerId}}/payment-eligibility
+
+###
+
+PUT {{host}}/api/v1/customers/{{customerId}}
+Content-Type: application/json
+
+{ "firstName": "Saidul Islam", "lastName": "Rajib", "phoneNumber": "+8801700000001" }
+
+###
+
+PUT {{host}}/api/v1/customers/{{customerId}}/email
+Content-Type: application/json
+
+{ "email": "rajib.new@example.com" }
+
+###
+
+PUT {{host}}/api/v1/customers/{{customerId}}/address
+Content-Type: application/json
+
+{ "address": { "line1": "Banani 11", "line2": "Flat 4B", "city": "Dhaka", "state": "Dhaka", "postalCode": "1213", "countryCode": "BD" } }
+
+###
+
+POST {{host}}/api/v1/customers/{{customerId}}/suspend
+Content-Type: application/json
+
+{ "reason": "Chargeback investigation" }
+
+###
+
+POST {{host}}/api/v1/customers/{{customerId}}/reactivate
+
+###
+
+POST {{host}}/api/v1/customers/{{customerId}}/kyc/verify
+
+###
+
+POST {{host}}/api/v1/customers/{{customerId}}/kyc/reject
+Content-Type: application/json
+
+{ "reason": "Document unreadable" }
+
+###
+
+POST {{host}}/api/v1/customers/{{customerId}}/close
+Content-Type: application/json
+
+{ "reason": "Customer request" }
+
+###
+
+GET {{host}}/health/ready

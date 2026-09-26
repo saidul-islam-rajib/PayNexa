@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Transactions.UnitTests</RootNamespace>
+    <TestingPlatformCommandLineArguments>--ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Transaction\Transaction.Application\Transaction.Application.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Transaction\Transaction.Domain\Transaction.Domain.csproj" />

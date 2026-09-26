@@ -1,23 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
+    <RootNamespace>PayNexa.Customers.API</RootNamespace>
+    <UserSecretsId>paynexa-customer-api</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..\..\..\..</DockerfileContext>
     <DockerComposeProjectPath>..\..\..\docker-compose.dcproj</DockerComposeProjectPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Mediator.SourceGenerator">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
+    <PackageReference Include="Riok.Mapperly" ExcludeAssets="runtime" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.Observability\PayNexa.Observability.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.AspNetCore\PayNexa.AspNetCore.csproj" />
     <ProjectReference Include="..\Customer.Application\Customer.Application.csproj" />
     <ProjectReference Include="..\Customer.Infrastructure\Customer.Infrastructure.csproj" />
   </ItemGroup>

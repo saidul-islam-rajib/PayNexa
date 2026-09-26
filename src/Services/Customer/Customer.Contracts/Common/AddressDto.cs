@@ -1,0 +1,9 @@
+namespace PayNexa.Customers.Contracts.Common;
+
+public sealed record AddressDto(
+    string Line1,
+    string? Line2,
+    string City,
+    string? State,
+    string PostalCode,
+    string CountryCode);

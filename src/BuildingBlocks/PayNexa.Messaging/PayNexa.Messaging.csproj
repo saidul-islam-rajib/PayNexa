@@ -1,7 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Confluent.Kafka" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PayNexa.BuildingBlocks.UnitTests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PayNexa.Common\PayNexa.Common.csproj" />
+    <ProjectReference Include="..\PayNexa.Messaging.Abstractions\PayNexa.Messaging.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

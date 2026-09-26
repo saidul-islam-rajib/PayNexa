@@ -3,6 +3,9 @@
     "Docker Compose": {
       "commandName": "DockerCompose",
       "commandVersion": "1.0",
+      "serviceName": "customer.api",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://localhost:{ServicePort}/swagger",
       "serviceActions": {
         "paynexa.apigateway": "StartDebugging",
         "authentication.api": "StartDebugging",
@@ -12,7 +15,10 @@
         "notification.api": "StartDebugging",
         "sqlserver": "StartWithoutDebugging",
         "mongodb": "StartWithoutDebugging",
-        "redis": "StartWithoutDebugging"
+        "kafka": "StartWithoutDebugging",
+        "kafka-ui": "StartWithoutDebugging",
+        "redis": "StartWithoutDebugging",
+        "seq": "StartWithoutDebugging"
       }
     }
   }

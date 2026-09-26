@@ -1,25 +1,37 @@
-using PayNexa.Observability;
+using PayNexa.AspNetCore.Initialization;
+using PayNexa.Logging;
+using PayNexa.Authentication.API;
+using PayNexa.Authentication.Application;
+using PayNexa.Authentication.Infrastructure;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = PayNexaLogging.CreateBootstrapLogger();
 
-builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-builder.Services.AddMediator(options => options.ServiceLifetime = ServiceLifetime.Scoped);
-builder.Services.AddPayNexaHealthChecks();
-
-var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
+try
 {
-    app.MapOpenApi();
+    var builder = WebApplication.CreateBuilder(args);
+    {
+        builder.Services
+            .AddPresentation(builder.Configuration, builder.Environment)
+            .AddApplication()
+            .AddInfrastructure(builder.Configuration);
+    }
+
+    var app = builder.Build();
+    {
+        app.UsePresentation();
+        await app.InitializeInfrastructureAsync();
+        await app.RunAsync();
+    }
+
+    return 0;
 }
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-app.MapPayNexaHealthChecks();
-
-app.Run();
+catch (Exception exception) when (exception is not HostAbortedException)
+{
+    Log.Fatal(exception, "Service terminated unexpectedly during startup");
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

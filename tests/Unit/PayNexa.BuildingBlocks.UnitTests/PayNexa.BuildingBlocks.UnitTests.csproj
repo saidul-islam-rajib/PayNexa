@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>PayNexa.BuildingBlocks.UnitTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\PayNexa.AspNetCore\PayNexa.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\PayNexa.Common\PayNexa.Common.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\PayNexa.Logging\PayNexa.Logging.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\PayNexa.Messaging\PayNexa.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\PayNexa.Observability\PayNexa.Observability.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\PayNexa.SqlServer\PayNexa.SqlServer.csproj" />
+  </ItemGroup>
+
+</Project>

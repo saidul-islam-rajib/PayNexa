@@ -1,2 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Customers.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\PayNexa.SharedKernel\PayNexa.SharedKernel.csproj" />
+  </ItemGroup>
+
 </Project>

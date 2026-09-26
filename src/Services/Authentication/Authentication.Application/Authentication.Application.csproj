@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <RootNamespace>PayNexa.Authentication.Application</RootNamespace>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Mediator.Abstractions" />
     <PackageReference Include="FluentValidation" />
