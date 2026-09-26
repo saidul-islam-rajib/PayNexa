@@ -6,7 +6,7 @@ x-service-environment: &service-environment
   ASPNETCORE_Kestrel__Certificates__Default__Password: ${DEV_CERT_PASSWORD}
   PayNexaLogging__SeqServerUrl: http://seq:5341
   PayNexaLogging__ConsoleFormat: Text
-  PayNexaLogging__HttpBodies__Enabled: "false"
+  PayNexaLogging__HttpBodies__Enabled: "true"
   Observability__OtlpTracesEndpoint: http://seq:5341/ingest/otlp/v1/traces
   MongoDb__ConnectionString: mongodb://mongodb:27017
   Redis__ConnectionString: redis:6379

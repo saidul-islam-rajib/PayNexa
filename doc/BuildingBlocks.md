@@ -367,7 +367,7 @@ One rule set (`SensitiveFields`) masks both structured log properties and JSON b
 `HttpBodyLoggingMiddleware` logs the JSON request body and the response body with its status code (event ids 2001 / 2002), after masking. It runs only when **both** hold:
 
 - the environment is `Development`, and
-- `PayNexaLogging:HttpBodies:Enabled` is `true` (set in every `appsettings.Development.json`; `false` in `appsettings.json` and forced `false` in Docker through `PayNexaLogging__HttpBodies__Enabled`).
+- `PayNexaLogging:HttpBodies:Enabled` is `true` (set in every `appsettings.Development.json`; `false` in `appsettings.json`; `true` in Docker through `PayNexaLogging__HttpBodies__Enabled` in `docker-compose.override.yml`, whose containers also run as Development).
 
 | Setting | Default | Meaning |
 |---|---|---|
